@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <OutputPath>..\..\Presentation\Nop.Web\Plugins\Misc.HireManagement</OutputPath>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NopBinariesPath Condition="'$(NopBinariesPath)' == ''">$(NOP_BINARIES_PATH)</NopBinariesPath>
+    <OutputPath>$(MSBuildProjectDirectory)\..\..\Presentation\Nop.Web\Plugins\Misc.HireManagement\</OutputPath>
     <OutDir>$(OutputPath)</OutDir>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
@@ -12,10 +14,30 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Libraries\Nop.Core\Nop.Core.csproj" />
-    <ProjectReference Include="..\..\Libraries\Nop.Services\Nop.Services.csproj" />
-    <ProjectReference Include="..\..\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj" />
-    <ClearPluginAssemblies Include="..\..\Build\ClearPluginAssemblies.proj" />
+    <Reference Include="Nop.Core">
+      <HintPath>$(NopBinariesPath)\Nop.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Nop.Data">
+      <HintPath>$(NopBinariesPath)\Nop.Data.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Nop.Services">
+      <HintPath>$(NopBinariesPath)\Nop.Services.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Nop.Web.Framework">
+      <HintPath>$(NopBinariesPath)\Nop.Web.Framework.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FluentMigrator">
+      <HintPath>$(NopBinariesPath)\FluentMigrator.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FluentMigrator.Abstractions">
+      <HintPath>$(NopBinariesPath)\FluentMigrator.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -51,8 +73,14 @@
     <Folder Include="Views\Shared\" />
   </ItemGroup>
 
-  <Target Name="NopTarget" AfterTargets="Build">
-    <MSBuild Projects="@(ClearPluginAssemblies)" Properties="PluginPath=$(OutDir)" Targets="NopClear" />
+  <Target Name="ValidateNopBinariesPath" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(NopBinariesPath)' == ''" Text="NopBinariesPath is not set. Set MSBuild property NopBinariesPath or environment variable NOP_BINARIES_PATH to a folder containing Nop.Core.dll, Nop.Services.dll, and Nop.Web.Framework.dll." />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Core.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Core.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Data.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Data.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Services.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Services.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Web.Framework.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Web.Framework.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\FluentMigrator.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\FluentMigrator.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\FluentMigrator.Abstractions.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\FluentMigrator.Abstractions.dll" />
   </Target>
 
 </Project>

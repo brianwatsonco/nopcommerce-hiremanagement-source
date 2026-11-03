@@ -20,6 +20,9 @@ The HireManagement plugin adds rental-focused capabilities to nopCommerce, inclu
 ## Build
 From repository root:
 
+This standalone plugin project references nopCommerce/FluentMigrator assemblies for compile-time only.
+Those references are configured with `Private=false` and `CopyLocalLockFileAssemblies=false`, so they are **not** copied into the plugin output/package.
+
 ## Output
 
 Build output should be copied to (or produced at):

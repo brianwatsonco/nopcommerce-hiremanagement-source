@@ -34,6 +34,7 @@
         var $startLegacyHidden = $('#' + config.startLegacyId);
         var $endLegacyHidden = $('#' + config.endLegacyId);
         var $form = $(config.formSelector);
+        var shouldApplyInitialDurationSelection = true;
 
         if (!$startDateInput.length || !$endDateInput.length || !$startTimeSelect.length || !$endTimeSelect.length || !$form.length)
             return;
@@ -53,6 +54,11 @@
         function parsePickerDate(value) {
             try { return $.datepicker.parseDate(config.dateFormat, value); }
             catch (e) { return null; }
+        }
+
+        function getTodayDate() {
+            var today = new Date();
+            return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
         }
 
         function composeDateTime(date, timeText) {
@@ -328,6 +334,10 @@
         }
 
         function getDateClassInfo(date) {
+            var today = getTodayDate();
+            if (date < today)
+                return [false, 'hire-day-unavailable', 'Unavailable'];
+
             var key = formatIsoDate(date);
             var state = availabilityByDate[key] || 'Available';
             if (state === 'FullyBooked')
@@ -337,6 +347,10 @@
             if (state === 'Unavailable')
                 return [false, 'hire-day-unavailable', 'Unavailable'];
             return [true, 'hire-day-available', 'Available'];
+        }
+
+        function markUserInteraction() {
+            shouldApplyInitialDurationSelection = false;
         }
 
         function validateSelectionAndAddToCart() {
@@ -382,6 +396,7 @@
 
         $startDateInput.datepicker({
             dateFormat: config.dateFormat,
+            minDate: 0,
             beforeShowDay: getDateClassInfo,
             onChangeMonthYear: function (year, month) {
                 loadMonthlyAvailability(year, month, function () {
@@ -389,12 +404,14 @@
                 });
             },
             onSelect: function () {
+                markUserInteraction();
                 setEndDateFromDuration();
             }
         });
 
         $endDateInput.datepicker({
             dateFormat: config.dateFormat,
+            minDate: 0,
             beforeShowDay: getDateClassInfo,
             onChangeMonthYear: function (year, month) {
                 loadMonthlyAvailability(year, month, function () {
@@ -402,6 +419,7 @@
                 });
             },
             onSelect: function () {
+                markUserInteraction();
                 syncHiddenFields();
                 updateDurationAttributeFromDateTimeSelection();
                 refreshPriceData();
@@ -409,12 +427,14 @@
         });
 
         $startTimeSelect.on('change', function () {
+            markUserInteraction();
             syncHiddenFields();
             updateDurationAttributeFromDateTimeSelection();
             refreshPriceData();
         });
 
         $endTimeSelect.on('change', function () {
+            markUserInteraction();
             syncHiddenFields();
             updateDurationAttributeFromDateTimeSelection();
             refreshPriceData();
@@ -423,6 +443,7 @@
         var attributeSelects = document.querySelectorAll(config.formSelector + " select[id^='product_attribute_']");
         for (var i = 0; i < attributeSelects.length; i++) {
             attributeSelects[i].addEventListener('change', function (event) {
+                markUserInteraction();
                 var changedSelect = event && event.target ? event.target : this;
                 setEndDateFromDuration();
                 var startDate = parsePickerDate($startDateInput.val()) || new Date();
@@ -449,13 +470,21 @@
             }, true);
         }
 
-        var initialDate = parsePickerDate($startDateInput.val()) || new Date();
+        var today = getTodayDate();
+        var initialStartDate = parsePickerDate($startDateInput.val());
+        if (!initialStartDate || initialStartDate < today) {
+            $startDateInput.val($.datepicker.formatDate(config.dateFormat, today));
+            setEndDateFromDuration();
+        }
+
+        var initialDate = parsePickerDate($startDateInput.val()) || today;
         loadMonthlyAvailability(initialDate.getFullYear(), initialDate.getMonth() + 1, function () {
             $startDateInput.datepicker('refresh');
             $endDateInput.datepicker('refresh');
-            updateDurationAttributeFromDateTimeSelection();
-            syncHiddenFields();
-            refreshPriceData();
+            if (shouldApplyInitialDurationSelection) {
+                setEndDateFromDuration();
+                shouldApplyInitialDurationSelection = false;
+            }
         });
     }
 
