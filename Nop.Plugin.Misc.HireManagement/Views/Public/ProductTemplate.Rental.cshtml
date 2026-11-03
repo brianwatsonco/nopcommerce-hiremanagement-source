@@ -1,0 +1,215 @@
+@model Nop.Web.Models.Catalog.ProductDetailsModel
+
+@using Nop.Core.Domain.Seo
+@using Nop.Services.Helpers
+@using Nop.Services.Html
+@using Nop.Web.Extensions
+
+@inject IHtmlFormatter htmlFormatter
+@inject IWebHelper webHelper
+@inject SeoSettings seoSettings
+
+@{
+    Layout = "_ColumnsOne";
+    NopHtml.AppendCssFileParts("~/Plugins/Misc.HireManagement/Content/hiremanagement.css");
+    NopHtml.AppendScriptParts(ResourceLocation.Footer, "~/Plugins/Misc.HireManagement/Content/hiremanagement.rental.js");
+
+    NopHtml.AddTitleParts(!string.IsNullOrEmpty(Model.MetaTitle) ? Model.MetaTitle : Model.Name);
+    NopHtml.AddMetaDescriptionParts(Model.MetaDescription);
+    NopHtml.AddMetaKeywordParts(Model.MetaKeywords);
+    NopHtml.AppendPageCssClassParts("html-product-details-page");
+    NopHtml.AddJsonLdParts(Model.JsonLd);
+}
+
+@section Breadcrumb
+{
+    @await Html.PartialAsync("_ProductBreadcrumb", Model.Breadcrumb)
+}
+
+<div class="page product-details-page">
+    <div class="page-body">
+        <form asp-route="Product" asp-route-sename="@Model.SeName" method="post" id="product-details-form">
+            <article data-productid="@Model.Id">
+                <div class="product-essential">
+                    <div class="gallery">
+                        @await Html.PartialAsync("_ProductDetailsPictures", Model)
+                        @await Html.PartialAsync("_ProductDetailsVideos", Model)
+                    </div>
+
+                    <div class="overview">
+                        @await Html.PartialAsync("_Discontinued", Model)
+
+                        <div class="product-name">
+                            <h1>@Model.Name</h1>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(Model.ShortDescription))
+                        {
+                            <div class="short-description">
+                                @Html.Raw(Model.ShortDescription)
+                            </div>
+                        }
+
+                        @await Html.PartialAsync("_ProductReviewOverview", Model.ProductReviewOverview)
+                        @await Html.PartialAsync("_ProductManufacturers", Model.ProductManufacturers)
+                        @await Html.PartialAsync("_Availability", Model)
+                        @await Html.PartialAsync("_SKU_Man_GTIN_Ven", Model)
+                        @await Html.PartialAsync("_DeliveryInfo", Model)
+                        @await Html.PartialAsync("_DownloadSample", Model)
+
+                        @if (!Model.IsRental)
+                        {
+                            var dataDictAttributes = new ViewDataDictionary(ViewData);
+                            dataDictAttributes.TemplateInfo.HtmlFieldPrefix = $"attributes_{Model.Id}";
+                            @await Html.PartialAsync("_ProductAttributes", Model, dataDictAttributes)
+                        }
+
+                        @{
+                            var dataDictGiftCard = new ViewDataDictionary(ViewData);
+                            dataDictGiftCard.TemplateInfo.HtmlFieldPrefix = $"giftcard_{Model.Id}";
+                            @await Html.PartialAsync("_GiftCardInfo", Model.GiftCard, dataDictGiftCard)
+                        }
+
+                        @if (Model.IsRental)
+                        {
+                            var startDateTimeFieldName = $"rental_start_datetime_{Model.Id}";
+                            var endDateTimeFieldName = $"rental_end_datetime_{Model.Id}";
+                            var startLegacyDateName = $"rental_start_date_{Model.Id}";
+                            var endLegacyDateName = $"rental_end_date_{Model.Id}";
+
+                            var startDatePickerId = $"rental_start_date_picker_{Model.Id}";
+                            var endDatePickerId = $"rental_end_date_picker_{Model.Id}";
+                            var startTimeSelectId = $"rental_start_time_{Model.Id}";
+                            var endTimeSelectId = $"rental_end_time_{Model.Id}";
+
+                            var rentalStart = Model.RentalStartDate ?? DateTime.Now.Date.AddHours(9);
+                            var rentalEnd = Model.RentalEndDate ?? rentalStart.AddDays(1);
+                            var rentalDurationDays = Math.Max(1, (int)Math.Ceiling((rentalEnd - rentalStart).TotalHours / 24d));
+                            var datePickerFormat = Html.GetJQueryDateFormat();
+                            var durationAttribute = Model.ProductAttributes.FirstOrDefault(attribute =>
+                                (!string.IsNullOrEmpty(attribute.TextPrompt) && attribute.TextPrompt.Contains("Number of days", StringComparison.OrdinalIgnoreCase)) ||
+                                (!string.IsNullOrEmpty(attribute.Name) && attribute.Name.Contains("Number of days", StringComparison.OrdinalIgnoreCase)))
+                                ?? Model.ProductAttributes.FirstOrDefault(attribute =>
+                                    (!string.IsNullOrEmpty(attribute.TextPrompt) && attribute.TextPrompt.Contains("day", StringComparison.OrdinalIgnoreCase)) ||
+                                    (!string.IsNullOrEmpty(attribute.Name) && attribute.Name.Contains("day", StringComparison.OrdinalIgnoreCase)));
+                            var durationAttributeId = durationAttribute?.Id ?? 0;
+
+                            <div class="attributes rental-attributes"
+                                 data-rental-config="true"
+                                 data-product-id="@Model.Id"
+                                 data-date-format="@datePickerFormat"
+                                 data-default-duration-days="@rentalDurationDays"
+                                 data-duration-attribute-id="@durationAttributeId"
+                                 data-start-time-default="@rentalStart.ToString("HH:mm")"
+                                 data-end-time-default="@rentalEnd.ToString("HH:mm")"
+                                 data-attribute-change-url="@Html.Raw(Url.Action("ProductDetails_AttributeChange", "ShoppingCart", new { productId = Model.Id, validateAttributeConditions = false, loadPicture = false }))"
+                                 data-monthly-availability-url="@Url.RouteUrl(HireManagementDefaults.PublicMonthlyAvailabilityRouteName)"
+                                 data-validate-selection-url="@Url.RouteUrl(HireManagementDefaults.PublicValidateRentalSelectionRouteName)"
+                                 data-add-to-cart-url="/addproducttocart/details/@Model.Id/1"
+                                 data-form-selector="#product-details-form"
+                                 data-start-date-id="@startDatePickerId"
+                                 data-end-date-id="@endDatePickerId"
+                                 data-start-time-id="@startTimeSelectId"
+                                 data-end-time-id="@endTimeSelectId"
+                                 data-start-datetime-id="@startDateTimeFieldName"
+                                 data-end-datetime-id="@endDateTimeFieldName"
+                                 data-start-legacy-id="@startLegacyDateName"
+                                 data-end-legacy-id="@endLegacyDateName">
+                                <div class="availability-legend">
+                                    <span class="availability-legend-item"><span class="availability-legend-swatch availability-legend-swatch-available"></span>@T("Plugins.Misc.HireManagement.Front.Legend.Available")</span>
+                                    <span class="availability-legend-item"><span class="availability-legend-swatch availability-legend-swatch-low-availability"></span>@T("Plugins.Misc.HireManagement.Front.Legend.LowAvailability")</span>
+                                    <span class="availability-legend-item"><span class="availability-legend-swatch availability-legend-swatch-unavailable"></span>@T("Plugins.Misc.HireManagement.Front.Legend.Unavailable")</span>
+                                    <span class="availability-legend-item"><span class="availability-legend-swatch availability-legend-swatch-fully-booked"></span>@T("Plugins.Misc.HireManagement.Front.Legend.FullyBooked")</span>
+                                </div>
+
+                                <div class="attribute-item rental-row rental-row-datetime">
+                                    <div class="attribute-label">
+                                        <label class="text-prompt" for="@startDatePickerId">Start date and time:</label>
+                                        <span class="required">*</span>
+                                    </div>
+                                    <div class="attribute-data rental-row-controls">
+                                        <input id="@startDatePickerId" type="text" class="datepicker" value="@rentalStart.ToString("dd/MM/yyyy")" autocomplete="off" />
+                                        <select id="@startTimeSelectId"></select>
+                                    </div>
+                                </div>
+
+                                <div class="attribute-item rental-row rental-row-days">
+                                    <div class="attribute-label">
+                                        <label class="text-prompt">Number of days:</label>
+                                        <span class="required">*</span>
+                                    </div>
+                                    <div class="attribute-data">
+                                        @{
+                                            var dataDictAttributes = new ViewDataDictionary(ViewData);
+                                            dataDictAttributes.TemplateInfo.HtmlFieldPrefix = $"attributes_{Model.Id}";
+                                            @await Html.PartialAsync("_ProductAttributes", Model, dataDictAttributes)
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="attribute-item rental-row rental-row-datetime">
+                                    <div class="attribute-label">
+                                        <label class="text-prompt" for="@endDatePickerId">End date and time:</label>
+                                        <span class="required">*</span>
+                                    </div>
+                                    <div class="attribute-data rental-row-controls">
+                                        <input id="@endDatePickerId" type="text" class="datepicker" value="@rentalEnd.ToString("dd/MM/yyyy")" autocomplete="off" />
+                                        <select id="@endTimeSelectId"></select>
+                                    </div>
+                                </div>
+
+                                <input type="hidden" id="@startDateTimeFieldName" name="@startDateTimeFieldName" value="@rentalStart.ToString("yyyy-MM-ddTHH:mm")" />
+                                <input type="hidden" id="@endDateTimeFieldName" name="@endDateTimeFieldName" value="@rentalEnd.ToString("yyyy-MM-ddTHH:mm")" />
+                                <input type="hidden" id="@startLegacyDateName" name="@startLegacyDateName" value="@rentalStart.ToString("dd/MM/yyyy")" />
+                                <input type="hidden" id="@endLegacyDateName" name="@endLegacyDateName" value="@rentalEnd.ToString("dd/MM/yyyy")" />
+                            </div>
+                        }
+
+                        @{
+                            var dataDictPrice = new ViewDataDictionary(ViewData);
+                            dataDictPrice.TemplateInfo.HtmlFieldPrefix = $"price_{Model.Id}";
+                            @await Html.PartialAsync("_ProductPrice", Model.ProductPrice, dataDictPrice)
+
+                            @await Html.PartialAsync("_ProductTierPrices", Model.TierPrices)
+
+                            var dataDictAddToCart = new ViewDataDictionary(ViewData);
+                            dataDictAddToCart.TemplateInfo.HtmlFieldPrefix = $"addtocart_{Model.Id}";
+                            @await Html.PartialAsync("_AddToCart", Model.AddToCart, dataDictAddToCart)
+
+                            @await Html.PartialAsync("_ProductEstimateShipping", Model.ProductEstimateShipping)
+                        }
+
+                        <div class="overview-buttons">
+                            @{
+                                var dataDictAddToWishlist = new ViewDataDictionary(ViewData);
+                                dataDictAddToWishlist.TemplateInfo.HtmlFieldPrefix = $"addtocart_{Model.Id}";
+                                @await Html.PartialAsync("_AddToWishlist", Model.AddToCart, dataDictAddToWishlist)
+                            }
+                            @await Html.PartialAsync("_CompareProductsButton", Model)
+                            @await Html.PartialAsync("_ProductEmailAFriendButton", Model)
+                        </div>
+
+                        @await Html.PartialAsync("_ShareButton", Model)
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.FullDescription))
+                    {
+                        <div class="full-description">
+                            @Html.Raw(Model.FullDescription)
+                        </div>
+                    }
+                </div>
+
+                <section class="product-collateral">
+                    @await Html.PartialAsync("_ProductSpecifications", Model.ProductSpecificationModel)
+                    @await Html.PartialAsync("_ProductTags", Model.ProductTags)
+                </section>
+            </article>
+        </form>
+
+        @if (Model.ProductReviewOverview.AllowCustomerReviews)
+        {
+            @await Html.PartialAsync("_ProductReviews", Model.ProductReviews)
+        }
+    </div>
+</div>

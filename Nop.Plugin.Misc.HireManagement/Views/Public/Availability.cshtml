@@ -1,0 +1,110 @@
+@model Nop.Plugin.Misc.HireManagement.Models.Front.HireAvailabilityViewModel
+
+@{
+    Layout = "_ColumnsOne";
+    var request = Model.Request;
+    NopHtml.AppendCssFileParts("~/Plugins/Misc.HireManagement/Content/hiremanagement.css");
+}
+
+<div class="page rental-availability-page">
+    <div class="page-title">
+        <h1>@T("Plugins.Misc.HireManagement.Front.Title")</h1>
+    </div>
+    <div class="page-body">
+        <form asp-controller="HirePublic" asp-action="Availability" method="get">
+            <div class="fieldset">
+                <div class="form-fields">
+                    <div class="inputs">
+                        <label asp-for="Request.ProductId"></label>
+                        <input asp-for="Request.ProductId" name="productId" />
+                    </div>
+                    <div class="inputs">
+                        <label asp-for="Request.Year"></label>
+                        <input asp-for="Request.Year" name="year" />
+                    </div>
+                    <div class="inputs">
+                        <label asp-for="Request.Month"></label>
+                        <input asp-for="Request.Month" name="month" />
+                    </div>
+                    <div class="inputs">
+                        <label asp-for="Request.DurationDays"></label>
+                        <input asp-for="Request.DurationDays" name="durationDays" min="1" />
+                    </div>
+                    <div class="buttons">
+                        <button type="submit" class="button-1 search-button">@T("Plugins.Misc.HireManagement.Front.Actions.Load")</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        @if (request.ProductId <= 0)
+        {
+            <div class="message-error">@T("Plugins.Misc.HireManagement.Front.Messages.EnterProduct")</div>
+        }
+        else if (!Model.ProductFound)
+        {
+            <div class="message-error">@T("Plugins.Misc.HireManagement.Front.Messages.ProductNotFound")</div>
+        }
+        else
+        {
+            <div class="product-name"><strong>@Model.ProductName</strong></div>
+
+            if (Model.Days.Any())
+            {
+                var firstDay = new DateTime(request.Year, request.Month, 1);
+                var startPadding = (int)firstDay.DayOfWeek;
+                var totalCells = startPadding + Model.Days.Count;
+                var endPadding = (7 - (totalCells % 7)) % 7;
+                var displayCells = totalCells + endPadding;
+
+                <div class="hire-calendar">
+                    <div class="hire-calendar-header">Sun</div>
+                    <div class="hire-calendar-header">Mon</div>
+                    <div class="hire-calendar-header">Tue</div>
+                    <div class="hire-calendar-header">Wed</div>
+                    <div class="hire-calendar-header">Thu</div>
+                    <div class="hire-calendar-header">Fri</div>
+                    <div class="hire-calendar-header">Sat</div>
+
+                    @for (var cellIndex = 0; cellIndex < displayCells; cellIndex++)
+                    {
+                        if (cellIndex < startPadding || cellIndex >= startPadding + Model.Days.Count)
+                        {
+                            <div class="hire-calendar-cell hire-calendar-empty"></div>
+                            continue;
+                        }
+
+                        var day = Model.Days[cellIndex - startPadding];
+                        var cssClass = day.State switch
+                        {
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.Available => "text-success",
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.LowAvailability => "text-warning",
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.FullyBooked => "text-danger",
+                            _ => "text-warning"
+                        };
+                        var stateClass = day.State switch
+                        {
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.Available => "hire-day-available",
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.LowAvailability => "hire-day-low-availability",
+                            Nop.Plugin.Misc.HireManagement.Domain.HireAvailabilityState.FullyBooked => "hire-day-fully-booked",
+                            _ => "hire-day-unavailable"
+                        };
+
+                        <div class="hire-calendar-cell hire-day-cell @stateClass">
+                            <strong class="hire-calendar-day">@day.Date.Day</strong>
+                            <div class="hire-day-state @cssClass">@day.State</div>
+                            <div class="hire-day-quantity">@day.RemainingQuantity/@day.TotalQuantity</div>
+                        </div>
+                    }
+                </div>
+
+                <div class="availability-legend">
+                    <span class="text-success">@T("Plugins.Misc.HireManagement.Front.Legend.Available")</span> |
+                    <span class="text-warning">@T("Plugins.Misc.HireManagement.Front.Legend.LowAvailability")</span> |
+                    <span class="text-warning">@T("Plugins.Misc.HireManagement.Front.Legend.Unavailable")</span> |
+                    <span class="text-danger">@T("Plugins.Misc.HireManagement.Front.Legend.FullyBooked")</span>
+                </div>
+            }
+        }
+    </div>
+</div>

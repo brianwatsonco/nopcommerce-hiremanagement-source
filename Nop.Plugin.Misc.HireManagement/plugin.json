@@ -1,0 +1,11 @@
+{
+  "Group": "Misc",
+  "FriendlyName": "Hire Management",
+  "SystemName": "Misc.HireManagement",
+  "Version": "5.00.1",
+  "SupportedVersions": [ "5.00" ],
+  "Author": "Brian Watson & Co.",
+  "DisplayOrder": 1,
+  "FileName": "Nop.Plugin.Misc.HireManagement.dll",
+  "Description": "Rental product hire and availability management."
+}
