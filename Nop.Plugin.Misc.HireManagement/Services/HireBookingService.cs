@@ -4,6 +4,7 @@ using Nop.Plugin.Misc.HireManagement.Models;
 using Nop.Services.Catalog;
 using Nop.Services.Helpers;
 using System.Globalization;
+using System.Transactions;
 
 namespace Nop.Plugin.Misc.HireManagement.Services;
 
@@ -149,7 +150,7 @@ public partial class HireBookingService : IHireBookingService
         return availability;
     }
 
-    public async Task<(bool IsValid, string Error)> ValidateAsync(HireBookingRecord bookingRecord, int? existingRecordId = null)
+    public async Task<(bool IsValid, string Error)> ValidateAsync(HireBookingRecord bookingRecord, int? existingRecordId = null, bool includeConflictCheck = true)
     {
         if (bookingRecord.ProductId <= 0)
             return (false, "Product is required.");
@@ -169,6 +170,21 @@ public partial class HireBookingService : IHireBookingService
                 return (false, "Order ID is required when status is FullyBooked.");
         }
 
+        if (!includeConflictCheck)
+            return (true, string.Empty);
+
+        var conflictWarning = await GetConflictWarningAsync(bookingRecord, existingRecordId);
+        if (!string.IsNullOrEmpty(conflictWarning))
+            return (false, conflictWarning);
+
+        return (true, string.Empty);
+    }
+
+    public async Task<string> GetConflictWarningAsync(HireBookingRecord bookingRecord, int? existingRecordId = null)
+    {
+        if (bookingRecord.ProductId <= 0 || bookingRecord.StartUtc >= bookingRecord.EndUtc)
+            return string.Empty;
+
         var newStartUtc = GetEffectiveBlockStart(bookingRecord);
         var newEndUtc = GetEffectiveBlockEnd(bookingRecord);
 
@@ -185,10 +201,10 @@ public partial class HireBookingService : IHireBookingService
             var existingEndUtc = GetEffectiveBlockEnd(existing);
 
             if (Intersects(newStartUtc, newEndUtc, existingStartUtc, existingEndUtc))
-                return (false, "The selected dates conflict with an existing booking or unavailability period.");
+                return "The selected dates conflict with an existing booking or unavailability period.";
         }
 
-        return (true, string.Empty);
+        return string.Empty;
     }
 
     public async Task<bool> IsSelectionAvailableAsync(int productId, DateTime startUtc, DateTime endUtc, int requestedQuantity = 1)
@@ -293,6 +309,27 @@ public partial class HireBookingService : IHireBookingService
         bookingRecord.AdminNote ??= string.Empty;
 
         await _hireBookingRecordRepository.UpdateAsync(bookingRecord);
+    }
+
+    public async Task<(bool Saved, string Error)> SaveValidatedAsync(HireBookingRecord bookingRecord, int? existingRecordId = null, bool includeConflictCheck = true)
+    {
+        using var scope = new TransactionScope(
+            TransactionScopeOption.Required,
+            new TransactionOptions { IsolationLevel = IsolationLevel.Serializable },
+            TransactionScopeAsyncFlowOption.Enabled);
+
+        var validationResult = await ValidateAsync(bookingRecord, existingRecordId, includeConflictCheck);
+        if (!validationResult.IsValid)
+            return (false, validationResult.Error);
+
+        if (existingRecordId.HasValue && existingRecordId.Value > 0)
+            await UpdateAsync(bookingRecord);
+        else
+            await InsertAsync(bookingRecord);
+
+        scope.Complete();
+
+        return (true, string.Empty);
     }
 
     public async Task DeleteAsync(HireBookingRecord bookingRecord)

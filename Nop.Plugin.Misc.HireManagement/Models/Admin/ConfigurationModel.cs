@@ -46,6 +46,9 @@ public record ConfigurationModel : BaseNopModel
     [NopResourceDisplayName("Plugins.Misc.HireManagement.Fields.OrderId")]
     public int? OrderId { get; set; }
 
+    [NopResourceDisplayName("Plugins.Misc.HireManagement.Fields.OrderItemId")]
+    public int? OrderItemId { get; set; }
+
     [NopResourceDisplayName("Plugins.Misc.HireManagement.Fields.PaidAmount")]
     public decimal PaidAmount { get; set; }
 

@@ -10,6 +10,10 @@ namespace Nop.Plugin.Misc.HireManagement.Controllers;
 
 public class HirePublicController : BasePluginController
 {
+    private const int MaxDurationDays = 90;
+    private const int PastYearsAllowed = 1;
+    private const int FutureYearsAllowed = 2;
+
     private readonly IHireBookingService _hireBookingService;
     private readonly IProductService _productService;
     private readonly IDateTimeHelper _dateTimeHelper;
@@ -26,12 +30,29 @@ public class HirePublicController : BasePluginController
     public async Task<IActionResult> Availability(int productId = 0, int? year = null, int? month = null, int durationDays = 1)
     {
         var nowStore = _dateTimeHelper.ConvertToUserTime(DateTime.UtcNow, TimeZoneInfo.Utc, _dateTimeHelper.DefaultStoreTimeZone);
+        var minYear = nowStore.Year - PastYearsAllowed;
+        var maxYear = nowStore.Year + FutureYearsAllowed;
+
+        var requestedYear = year ?? nowStore.Year;
+        var boundedYear = requestedYear < minYear || requestedYear > maxYear
+            ? nowStore.Year
+            : requestedYear;
+
+        var requestedMonth = month ?? nowStore.Month;
+        var boundedMonth = requestedMonth is < 1 or > 12
+            ? nowStore.Month
+            : requestedMonth;
+
+        var boundedDurationDays = durationDays < 1
+            ? 1
+            : Math.Min(durationDays, MaxDurationDays);
+
         var request = new HireAvailabilityRequestModel
         {
             ProductId = productId,
-            Year = year ?? nowStore.Year,
-            Month = month ?? nowStore.Month,
-            DurationDays = durationDays < 1 ? 1 : durationDays
+            Year = boundedYear,
+            Month = boundedMonth,
+            DurationDays = boundedDurationDays
         };
 
         var model = new HireAvailabilityViewModel
@@ -66,6 +87,10 @@ public class HirePublicController : BasePluginController
         if (parsedEndStoreTime <= parsedStartStoreTime)
             return Json(new { isAvailable = false, message = "End date/time must be later than start date/time." });
 
+        var nowStore = _dateTimeHelper.ConvertToUserTime(DateTime.UtcNow, TimeZoneInfo.Utc, _dateTimeHelper.DefaultStoreTimeZone);
+        if (parsedStartStoreTime < nowStore)
+            return Json(new { isAvailable = false, message = "Start date/time cannot be in the past." });
+
         if (product.StockQuantity <= 0)
             return Json(new { isAvailable = false, message = "This product is currently unavailable for the selected dates." });
 
@@ -86,14 +111,23 @@ public class HirePublicController : BasePluginController
     [HttpGet]
     public async Task<IActionResult> MonthlyAvailability(int productId, int year, int month, int durationDays = 1)
     {
-        if (productId <= 0 || year < 1 || month is < 1 or > 12)
+        if (productId <= 0 || month is < 1 or > 12)
+            return Json(new { success = false, days = Array.Empty<object>() });
+
+        var nowStore = _dateTimeHelper.ConvertToUserTime(DateTime.UtcNow, TimeZoneInfo.Utc, _dateTimeHelper.DefaultStoreTimeZone);
+        var minYear = nowStore.Year - PastYearsAllowed;
+        var maxYear = nowStore.Year + FutureYearsAllowed;
+        if (year < minYear || year > maxYear)
+            return Json(new { success = false, days = Array.Empty<object>() });
+
+        if (durationDays < 1 || durationDays > MaxDurationDays)
             return Json(new { success = false, days = Array.Empty<object>() });
 
         var product = await _productService.GetProductByIdAsync(productId);
         if (product == null || product.Deleted || !product.Published)
             return Json(new { success = false, days = Array.Empty<object>() });
 
-        var days = await _hireBookingService.GetMonthlyAvailabilityAsync(productId, year, month);
+        var days = await _hireBookingService.GetMonthlyAvailabilityForDurationAsync(productId, year, month, durationDays);
 
         return Json(new
         {

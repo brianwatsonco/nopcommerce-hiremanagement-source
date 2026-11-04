@@ -16,6 +16,8 @@ public class HireBookingRecord : BaseEntity
 
     public int? OrderId { get; set; }
 
+    public int? OrderItemId { get; set; }
+
     public decimal PaidAmount { get; set; }
 
     public int Quantity { get; set; }

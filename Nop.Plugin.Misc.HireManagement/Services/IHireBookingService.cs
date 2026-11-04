@@ -13,7 +13,9 @@ public partial interface IHireBookingService
 
     Task<IList<HireAvailabilityDay>> GetMonthlyAvailabilityForDurationAsync(int productId, int year, int month, int durationDays);
 
-    Task<(bool IsValid, string Error)> ValidateAsync(HireBookingRecord bookingRecord, int? existingRecordId = null);
+    Task<(bool IsValid, string Error)> ValidateAsync(HireBookingRecord bookingRecord, int? existingRecordId = null, bool includeConflictCheck = true);
+
+    Task<string> GetConflictWarningAsync(HireBookingRecord bookingRecord, int? existingRecordId = null);
 
     Task<bool> IsSelectionAvailableAsync(int productId, DateTime startUtc, DateTime endUtc, int requestedQuantity = 1);
 
@@ -24,4 +26,6 @@ public partial interface IHireBookingService
     Task UpdateAsync(HireBookingRecord bookingRecord);
 
     Task DeleteAsync(HireBookingRecord bookingRecord);
+
+    Task<(bool Saved, string Error)> SaveValidatedAsync(HireBookingRecord bookingRecord, int? existingRecordId = null, bool includeConflictCheck = true);
 }

@@ -133,6 +133,7 @@
                                     var recordStatusId = existingRecord != null ? (int)existingRecord.Status : (int)HireAvailabilityState.Unavailable;
                                     var recordCustomerId = existingRecord?.CustomerId?.ToString() ?? string.Empty;
                                     var recordOrderId = existingRecord?.OrderId?.ToString() ?? string.Empty;
+                                    var recordOrderItemId = existingRecord?.OrderItemId?.ToString() ?? string.Empty;
                                     var recordPaidAmount = existingRecord?.PaidAmount.ToString("0.##", CultureInfo.InvariantCulture) ?? "0";
                                     var recordQuantity = (existingRecord?.Quantity ?? 1).ToString(CultureInfo.InvariantCulture);
                                     var recordAdminNote = existingRecord?.AdminNote ?? string.Empty;
@@ -146,6 +147,7 @@
                                          data-status="@recordStatusId"
                                          data-customer-id="@recordCustomerId"
                                          data-order-id="@recordOrderId"
+                                         data-order-item-id="@recordOrderItemId"
                                          data-paid-amount="@recordPaidAmount"
                                          data-quantity="@recordQuantity"
                                          data-admin-note="@recordAdminNote">
@@ -226,6 +228,10 @@
                             <label asp-for="OrderId"></label>
                             <input asp-for="OrderId" class="form-control" id="modal-order-id" />
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="OrderItemId"></label>
+                        <input asp-for="OrderItemId" class="form-control" id="modal-order-item-id" />
                     </div>
                     <div class="form-group">
                         <label asp-for="PaidAmount"></label>
@@ -402,6 +408,14 @@
                         </div>
                         <div class="form-group row">
                             <div class="col-md-3">
+                                <nop-label asp-for="OrderItemId" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-editor asp-for="OrderItemId" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
                                 <nop-label asp-for="PaidAmount" />
                             </div>
                             <div class="col-md-9">
@@ -449,6 +463,7 @@
                                     <th>@T("Plugins.Misc.HireManagement.Fields.EndUtc")</th>
                                     <th>@T("Plugins.Misc.HireManagement.Fields.Customer")</th>
                                     <th>@T("Plugins.Misc.HireManagement.Fields.OrderId")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.OrderItemId")</th>
                                     <th>@T("Plugins.Misc.HireManagement.Fields.PaidAmount")</th>
                                     <th>@T("Plugins.Misc.HireManagement.Fields.Quantity")</th>
                                     <th>@T("Plugins.Misc.HireManagement.Fields.SurchargeReview")</th>
@@ -477,6 +492,7 @@
                                         <td>@row.EndUtc</td>
                                         <td>@row.CustomerId (@row.CustomerEmail)</td>
                                         <td>@row.OrderId</td>
+                                        <td>@row.OrderItemId</td>
                                         <td>@row.PaidAmount</td>
                                         <td>
                                             @if (row.IsSurchargeReviewRequired)

@@ -15,5 +15,6 @@ public class HireBookingRecordBuilder : NopEntityBuilder<HireBookingRecord>
         table.WithColumn(nameof(HireBookingRecord.ProductId)).AsInt32().ForeignKey<Product>();
         table.WithColumn(nameof(HireBookingRecord.CustomerId)).AsInt32().Nullable().ForeignKey<Customer>();
         table.WithColumn(nameof(HireBookingRecord.OrderId)).AsInt32().Nullable().ForeignKey<Order>();
+        table.WithColumn(nameof(HireBookingRecord.OrderItemId)).AsInt32().Nullable().ForeignKey<OrderItem>();
     }
 }

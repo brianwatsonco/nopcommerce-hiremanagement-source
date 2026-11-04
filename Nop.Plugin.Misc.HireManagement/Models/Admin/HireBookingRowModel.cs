@@ -18,6 +18,8 @@ public record HireBookingRowModel
 
     public int? OrderId { get; init; }
 
+    public int? OrderItemId { get; init; }
+
     public decimal PaidAmount { get; init; }
 
     public int Quantity { get; init; }

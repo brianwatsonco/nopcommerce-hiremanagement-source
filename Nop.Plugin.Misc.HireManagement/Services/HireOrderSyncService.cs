@@ -9,14 +9,17 @@ public class HireOrderSyncService : IHireOrderSyncService
     private readonly IRepository<HireBookingRecord> _hireBookingRecordRepository;
     private readonly IRepository<OrderItem> _orderItemRepository;
     private readonly IRepository<Order> _orderRepository;
+    private readonly IHireBookingService _hireBookingService;
 
     public HireOrderSyncService(IRepository<HireBookingRecord> hireBookingRecordRepository,
         IRepository<OrderItem> orderItemRepository,
-        IRepository<Order> orderRepository)
+        IRepository<Order> orderRepository,
+        IHireBookingService hireBookingService)
     {
         _hireBookingRecordRepository = hireBookingRecordRepository;
         _orderItemRepository = orderItemRepository;
         _orderRepository = orderRepository;
+        _hireBookingService = hireBookingService;
     }
 
     public async Task<int> SyncOrderAsync(Order order)
@@ -30,6 +33,9 @@ public class HireOrderSyncService : IHireOrderSyncService
         var rentalItems = await _orderItemRepository.Table
             .Where(item => item.OrderId == order.Id && item.RentalStartDateUtc.HasValue && item.RentalEndDateUtc.HasValue)
             .ToListAsync();
+
+        var activeRentalItemIds = rentalItems.Select(item => item.Id).ToHashSet();
+        await ReleaseMissingOrderItemsAsync(order, activeRentalItemIds, "Order item removed or rental dates changed.");
 
         if (!rentalItems.Any())
             return 0;
@@ -118,31 +124,51 @@ public class HireOrderSyncService : IHireOrderSyncService
         var rentalEndUtc = item.RentalEndDateUtc!.Value;
 
         var existingRecord = await _hireBookingRecordRepository.Table
-            .FirstOrDefaultAsync(record =>
-                record.OrderId == order.Id &&
-                record.ProductId == item.ProductId &&
-                record.StatusId == (int)HireAvailabilityState.FullyBooked &&
-                record.StartUtc == rentalStartUtc &&
-                record.EndUtc == rentalEndUtc);
+            .FirstOrDefaultAsync(record => record.OrderItemId == item.Id);
+
+        if (existingRecord == null)
+        {
+            existingRecord = await _hireBookingRecordRepository.Table
+                .FirstOrDefaultAsync(record =>
+                    record.OrderId == order.Id &&
+                    record.ProductId == item.ProductId &&
+                    record.StatusId == (int)HireAvailabilityState.FullyBooked &&
+                    record.StartUtc == rentalStartUtc &&
+                    record.EndUtc == rentalEndUtc);
+        }
 
         if (existingRecord != null)
         {
             var normalizedQuantity = item.Quantity < 1 ? 1 : item.Quantity;
-            if (existingRecord.IsCancelled || existingRecord.Quantity != normalizedQuantity)
+            if (existingRecord.IsCancelled ||
+                existingRecord.Quantity != normalizedQuantity ||
+                existingRecord.OrderItemId != item.Id ||
+                existingRecord.StartUtc != rentalStartUtc ||
+                existingRecord.EndUtc != rentalEndUtc ||
+                existingRecord.CustomerId != order.CustomerId ||
+                existingRecord.OrderId != order.Id ||
+                existingRecord.PaidAmount != item.PriceInclTax)
             {
                 existingRecord.IsCancelled = false;
                 existingRecord.CancelledOnUtc = null;
                 existingRecord.CancellationNote = null;
+                existingRecord.StartUtc = rentalStartUtc;
+                existingRecord.EndUtc = rentalEndUtc;
+                existingRecord.CustomerId = order.CustomerId;
+                existingRecord.OrderId = order.Id;
                 existingRecord.Quantity = normalizedQuantity;
+                existingRecord.OrderItemId = item.Id;
+                existingRecord.PaidAmount = item.PriceInclTax;
                 existingRecord.UpdatedOnUtc = DateTime.UtcNow;
-                await _hireBookingRecordRepository.UpdateAsync(existingRecord);
-                return 1;
+
+                var updateResult = await _hireBookingService.SaveValidatedAsync(existingRecord, existingRecord.Id, includeConflictCheck: true);
+                return updateResult.Saved ? 1 : 0;
             }
 
             return 0;
         }
 
-        await _hireBookingRecordRepository.InsertAsync(new HireBookingRecord
+        var newRecord = new HireBookingRecord
         {
             ProductId = item.ProductId,
             StatusId = (int)HireAvailabilityState.FullyBooked,
@@ -150,6 +176,7 @@ public class HireOrderSyncService : IHireOrderSyncService
             EndUtc = rentalEndUtc,
             CustomerId = order.CustomerId,
             OrderId = order.Id,
+            OrderItemId = item.Id,
             PaidAmount = item.PriceInclTax,
             Quantity = item.Quantity < 1 ? 1 : item.Quantity,
             AdminNote = "Created from website order",
@@ -157,8 +184,44 @@ public class HireOrderSyncService : IHireOrderSyncService
             CancellationNote = string.Empty,
             CreatedOnUtc = DateTime.UtcNow,
             UpdatedOnUtc = DateTime.UtcNow
-        });
+        };
 
-        return 1;
+        var insertResult = await _hireBookingService.SaveValidatedAsync(newRecord, includeConflictCheck: true);
+        return insertResult.Saved ? 1 : 0;
+    }
+
+    private async Task<int> ReleaseMissingOrderItemsAsync(Order order, HashSet<int> activeRentalItemIds, string reason)
+    {
+        if (order == null)
+            return 0;
+
+        var records = await _hireBookingRecordRepository.Table
+            .Where(record => record.OrderId == order.Id)
+            .Where(record => record.StatusId == (int)HireAvailabilityState.FullyBooked)
+            .Where(record => !record.IsCancelled)
+            .ToListAsync();
+
+        if (!records.Any())
+            return 0;
+
+        var updated = 0;
+
+        foreach (var record in records)
+        {
+            if (!record.OrderItemId.HasValue)
+                continue;
+
+            if (activeRentalItemIds.Contains(record.OrderItemId.Value))
+                continue;
+
+            record.IsCancelled = true;
+            record.CancelledOnUtc = DateTime.UtcNow;
+            record.CancellationNote = reason;
+            record.UpdatedOnUtc = DateTime.UtcNow;
+            await _hireBookingRecordRepository.UpdateAsync(record);
+            updated++;
+        }
+
+        return updated;
     }
 }

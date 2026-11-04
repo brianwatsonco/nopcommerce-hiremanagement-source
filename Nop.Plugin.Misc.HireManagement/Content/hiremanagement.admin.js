@@ -9,6 +9,7 @@
             $('#modal-status-id').val($target.data('status'));
             $('#modal-customer-id').val($target.data('customer-id') || '');
             $('#modal-order-id').val($target.data('order-id') || '');
+            $('#modal-order-item-id').val($target.data('order-item-id') || '');
             $('#modal-paid-amount').val($target.data('paid-amount') || '0');
             $('#modal-quantity').val($target.data('quantity') || '1');
             $('#modal-admin-note').val($target.data('admin-note') || '');

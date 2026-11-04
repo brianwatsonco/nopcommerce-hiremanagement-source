@@ -154,12 +154,13 @@ public class HireManagementController : BasePluginController
                     EndUtc = normalizedEndUtc,
                     CustomerId = model.CustomerId,
                     OrderId = model.OrderId,
+                    OrderItemId = model.OrderItemId,
                     PaidAmount = model.PaidAmount,
                     Quantity = model.Quantity,
                     AdminNote = model.AdminNote
                 };
 
-                var createValidationResult = await _hireBookingService.ValidateAsync(newRecordFromMissingId);
+                var createValidationResult = await _hireBookingService.ValidateAsync(newRecordFromMissingId, includeConflictCheck: false);
                 if (!createValidationResult.IsValid)
                 {
                     _notificationService.ErrorNotification(createValidationResult.Error);
@@ -167,8 +168,13 @@ public class HireManagementController : BasePluginController
                     return View("~/Plugins/Misc.HireManagement/Views/Admin/Configure.cshtml", model);
                 }
 
+                var createConflictWarning = await _hireBookingService.GetConflictWarningAsync(newRecordFromMissingId);
+
                 await _hireBookingService.InsertAsync(newRecordFromMissingId);
                 _notificationService.WarningNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.RecordIdNotFoundCreated"));
+
+                if (!string.IsNullOrEmpty(createConflictWarning))
+                    _notificationService.WarningNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.PotentialConflictSaved"));
 
                 if (requiresSurchargeReview)
                     _notificationService.WarningNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.SurchargeReviewRequired"));
@@ -182,11 +188,12 @@ public class HireManagementController : BasePluginController
             existingRecord.EndUtc = normalizedEndUtc;
             existingRecord.CustomerId = model.CustomerId;
             existingRecord.OrderId = model.OrderId;
+            existingRecord.OrderItemId = model.OrderItemId;
             existingRecord.PaidAmount = model.PaidAmount;
             existingRecord.Quantity = model.Quantity;
             existingRecord.AdminNote = model.AdminNote;
 
-            var validationResult = await _hireBookingService.ValidateAsync(existingRecord, existingRecord.Id);
+            var validationResult = await _hireBookingService.ValidateAsync(existingRecord, existingRecord.Id, includeConflictCheck: false);
             if (!validationResult.IsValid)
             {
                 _notificationService.ErrorNotification(validationResult.Error);
@@ -194,8 +201,13 @@ public class HireManagementController : BasePluginController
                 return View("~/Plugins/Misc.HireManagement/Views/Admin/Configure.cshtml", model);
             }
 
+            var conflictWarning = await _hireBookingService.GetConflictWarningAsync(existingRecord, existingRecord.Id);
+
             await _hireBookingService.UpdateAsync(existingRecord);
             _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.RecordUpdated"));
+
+            if (!string.IsNullOrEmpty(conflictWarning))
+                _notificationService.WarningNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.PotentialConflictSaved"));
         }
         else
         {
@@ -207,12 +219,13 @@ public class HireManagementController : BasePluginController
                 EndUtc = normalizedEndUtc,
                 CustomerId = model.CustomerId,
                 OrderId = model.OrderId,
+                OrderItemId = model.OrderItemId,
                 PaidAmount = model.PaidAmount,
                 Quantity = model.Quantity,
                 AdminNote = model.AdminNote
             };
 
-            var validationResult = await _hireBookingService.ValidateAsync(newRecord);
+            var validationResult = await _hireBookingService.ValidateAsync(newRecord, includeConflictCheck: false);
             if (!validationResult.IsValid)
             {
                 _notificationService.ErrorNotification(validationResult.Error);
@@ -220,8 +233,13 @@ public class HireManagementController : BasePluginController
             return View("~/Plugins/Misc.HireManagement/Views/Admin/Configure.cshtml", model);
             }
 
+            var conflictWarning = await _hireBookingService.GetConflictWarningAsync(newRecord);
+
             await _hireBookingService.InsertAsync(newRecord);
             _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.RecordAdded"));
+
+            if (!string.IsNullOrEmpty(conflictWarning))
+                _notificationService.WarningNotification(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Messages.PotentialConflictSaved"));
         }
 
         if (requiresSurchargeReview)
@@ -357,6 +375,7 @@ public class HireManagementController : BasePluginController
                 CustomerId = record.CustomerId,
                 CustomerEmail = customerEmail,
                 OrderId = record.OrderId,
+                OrderItemId = record.OrderItemId,
                 PaidAmount = paidAmount,
                 Quantity = record.Quantity,
                 AdminNote = record.AdminNote ?? string.Empty,
@@ -380,6 +399,7 @@ public class HireManagementController : BasePluginController
         model.EndUtc = _dateTimeHelper.ConvertToUserTime(record.EndUtc, TimeZoneInfo.Utc, _dateTimeHelper.DefaultStoreTimeZone);
         model.CustomerId = record.CustomerId;
         model.OrderId = record.OrderId;
+        model.OrderItemId = record.OrderItemId;
         model.PaidAmount = record.PaidAmount;
         model.Quantity = record.Quantity < 1 ? 1 : record.Quantity;
         model.AdminNote = record.AdminNote ?? string.Empty;
