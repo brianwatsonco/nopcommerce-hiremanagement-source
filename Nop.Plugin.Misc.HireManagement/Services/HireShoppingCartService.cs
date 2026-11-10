@@ -4,6 +4,7 @@ using Nop.Core;
 using Nop.Core.Caching;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
+using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Stores;
 using Nop.Core.Events;
@@ -21,6 +22,7 @@ using Nop.Services.Seo;
 using Nop.Services.Shipping;
 using Nop.Services.Shipping.Date;
 using Nop.Services.Stores;
+using System.Text.RegularExpressions;
 
 namespace Nop.Plugin.Misc.HireManagement.Services;
 
@@ -119,7 +121,95 @@ public class HireShoppingCartService : ShoppingCartService
         if (!available)
             warnings.Add(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Front.Messages.CartConflict"));
 
+        if (warnings.Any())
+            return warnings;
+
+        // Prevent overbooking by combining overlapping rental lines already in the cart
+        var cartItems = await GetShoppingCartAsync(customer,
+            shoppingCartType: ShoppingCartType.ShoppingCart,
+            storeId: storeId,
+            productId: product.Id);
+
+        var overlappingQuantity = 0;
+        foreach (var item in cartItems)
+        {
+            if (shoppingCartItemId > 0 && item.Id == shoppingCartItemId)
+                continue;
+
+            if (!item.RentalStartDateUtc.HasValue || !item.RentalEndDateUtc.HasValue)
+                continue;
+
+            if (!Intersects(rentalStartDate.Value, rentalEndDate.Value, item.RentalStartDateUtc.Value, item.RentalEndDateUtc.Value))
+                continue;
+
+            overlappingQuantity += Math.Max(item.Quantity, 1);
+        }
+
+        var capacity = Math.Max(product.StockQuantity, 1);
+        if (overlappingQuantity + normalizedQuantity > capacity)
+            warnings.Add(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Front.Messages.CartConflict"));
+
         return warnings;
+    }
+
+    public override async Task<(decimal unitPrice, decimal discountAmount, List<Discount> appliedDiscounts)> GetUnitPriceAsync(Product product,
+        Customer customer,
+        Store store,
+        ShoppingCartType shoppingCartType,
+        int quantity,
+        string attributesXml,
+        decimal customerEnteredPrice,
+        DateTime? rentalStartDate,
+        DateTime? rentalEndDate,
+        bool includeDiscounts)
+    {
+        if (product?.IsRental == true && rentalStartDate.HasValue && rentalEndDate.HasValue && !string.IsNullOrEmpty(attributesXml))
+        {
+            var selectedDurationDays = await GetSelectedDurationDaysAsync(attributesXml);
+            if (selectedDurationDays.HasValue && selectedDurationDays.Value > 0)
+            {
+                var normalizedDaysForPricing = selectedDurationDays.Value > 7 ? 7 : selectedDurationDays.Value;
+                rentalEndDate = rentalStartDate.Value.AddDays(normalizedDaysForPricing);
+            }
+        }
+
+        return await base.GetUnitPriceAsync(product,
+            customer,
+            store,
+            shoppingCartType,
+            quantity,
+            attributesXml,
+            customerEnteredPrice,
+            rentalStartDate,
+            rentalEndDate,
+            includeDiscounts);
+    }
+
+    private async Task<int?> GetSelectedDurationDaysAsync(string attributesXml)
+    {
+        var values = await _productAttributeParser.ParseProductAttributeValuesAsync(attributesXml);
+        if (values == null || values.Count == 0)
+            return null;
+
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value?.Name))
+                continue;
+
+            var match = Regex.Match(value.Name, "(\\d+)\\s*day", RegexOptions.IgnoreCase);
+            if (!match.Success)
+                continue;
+
+            if (int.TryParse(match.Groups[1].Value, out var parsedDays) && parsedDays > 0)
+                return parsedDays;
+        }
+
+        return null;
+    }
+
+    private static bool Intersects(DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd)
+    {
+        return aStart <= bEnd && bStart <= aEnd;
     }
 
     public override async Task<IList<string>> GetShoppingCartWarningsAsync(IList<ShoppingCartItem> shoppingCart,

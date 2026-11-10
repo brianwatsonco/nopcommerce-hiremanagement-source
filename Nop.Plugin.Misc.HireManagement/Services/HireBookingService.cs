@@ -48,7 +48,7 @@ public partial class HireBookingService : IHireBookingService
         if (product == null || product.Deleted || !product.Published)
             return [];
 
-        var totalStock = product.StockQuantity;
+        var totalStock = GetEffectiveFleetQuantity(product);
         var lowAvailabilityThreshold = Math.Max(product.MinStockQuantity, 0);
 
         var daysInMonth = DateTime.DaysInMonth(year, month);
@@ -91,7 +91,7 @@ public partial class HireBookingService : IHireBookingService
         if (product == null || product.Deleted || !product.Published)
             return [];
 
-        var totalStock = product.StockQuantity;
+        var totalStock = GetEffectiveFleetQuantity(product);
         var lowAvailabilityThreshold = Math.Max(product.MinStockQuantity, 0);
 
         if (durationDays < 1)
@@ -239,7 +239,7 @@ public partial class HireBookingService : IHireBookingService
             .Where(record => Intersects(requestedStart, requestedEnd, GetEffectiveBlockStart(record), GetEffectiveBlockEnd(record)))
             .Sum(record => Math.Max(record.Quantity, 1));
 
-        var totalStock = Math.Max(product.StockQuantity, 0);
+        var totalStock = GetEffectiveFleetQuantity(product);
         var affectedQuantity = Math.Min(unavailableQuantity + bookedQuantity, totalStock);
         var remainingQuantity = totalStock - affectedQuantity;
 
@@ -284,6 +284,16 @@ public partial class HireBookingService : IHireBookingService
             .Sum(record => Math.Max(record.Quantity, 1));
 
         return Math.Min(Math.Max(unavailableQuantity, 0), Math.Max(totalStock, 0));
+    }
+
+    private static int GetEffectiveFleetQuantity(Core.Domain.Catalog.Product product)
+    {
+        if (product == null)
+            return 1;
+
+        // For rentals, stock can be decremented by order placement in core flows.
+        // Keep scheduling capacity at least 1 to avoid turning entire months into 0/0 fully booked.
+        return Math.Max(product.StockQuantity, 1);
     }
 
     public bool RequiresSurchargeReview(DateTime startStoreTime, DateTime endStoreTime)

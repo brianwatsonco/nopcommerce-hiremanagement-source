@@ -319,7 +319,8 @@
                 productId: config.productId,
                 year: year,
                 month: month,
-                durationDays: getSelectedDurationDays()
+                // Calendar coloring must be day-by-day occupancy, independent of selected hire length
+                durationDays: 1
             }).done(function (response) {
                 availabilityByDate = {};
                 if (response && response.success && response.days) {
@@ -351,6 +352,19 @@
 
         function markUserInteraction() {
             shouldApplyInitialDurationSelection = false;
+        }
+
+        function refreshAfterOptionChange(changedElement) {
+            syncHiddenFields();
+
+            if (config.durationAttributeId > 0
+                && changedElement
+                && changedElement.id === ('product_attribute_' + config.durationAttributeId)) {
+                setEndDateFromDuration();
+                return;
+            }
+
+            refreshPriceData();
         }
 
         function validateSelectionAndAddToCart() {
@@ -440,26 +454,18 @@
             refreshPriceData();
         });
 
-        var attributeSelects = document.querySelectorAll(config.formSelector + " select[id^='product_attribute_']");
-        for (var i = 0; i < attributeSelects.length; i++) {
-            attributeSelects[i].addEventListener('change', function (event) {
-                markUserInteraction();
-                var changedSelect = event && event.target ? event.target : this;
-                setEndDateFromDuration();
-                var startDate = parsePickerDate($startDateInput.val()) || new Date();
-                loadMonthlyAvailability(startDate.getFullYear(), startDate.getMonth() + 1, function () {
-                    $startDateInput.datepicker('refresh');
-                    $endDateInput.datepicker('refresh');
-                });
+        $form.on('change', "select[id^='product_attribute_'], input[name^='product_attribute_'], textarea[name^='product_attribute_']", function (event) {
+            markUserInteraction();
 
-                if (config.durationAttributeId > 0 && changedSelect && changedSelect.id === ('product_attribute_' + config.durationAttributeId)) {
-                    window.setTimeout(function () {
-                        syncHiddenFields();
-                        refreshPriceData();
-                    }, 250);
-                }
+            var changedElement = event && event.target ? event.target : this;
+            refreshAfterOptionChange(changedElement);
+
+            var startDate = parsePickerDate($startDateInput.val()) || new Date();
+            loadMonthlyAvailability(startDate.getFullYear(), startDate.getMonth() + 1, function () {
+                $startDateInput.datepicker('refresh');
+                $endDateInput.datepicker('refresh');
             });
-        }
+        });
 
         var addToCartButton = document.getElementById('add-to-cart-button-' + config.productId);
         if (addToCartButton) {

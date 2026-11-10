@@ -1,5 +1,7 @@
+@import url("../Themes/McTours/Content/css/root.css");
+
 .hire-day-cell {
-    color: #212529;
+    color: var(--dark-border);
 }
 
 .hire-calendar {
@@ -12,14 +14,14 @@
     font-weight: 600;
     text-align: center;
     padding: 0.35rem 0.2rem;
-    background-color: #f7f7f7;
-    border: 1px solid #e5e5e5;
+    background-color: var(--off-white);
+    border: 1px solid var(--light-grey);
 }
 
 .hire-calendar-cell {
     min-height: 78px;
     padding: 0.4rem;
-    border: 1px solid #dfe3e7;
+    border: 1px solid var(--light-grey);
     border-radius: 4px;
 }
 
@@ -36,8 +38,8 @@
 }
 
 .hire-calendar-empty {
-    border: 1px dashed #e5e5e5;
-    background-color: #fafafa;
+    border: 1px dashed var(--light-grey);
+    background-color: var(--off-white);
 }
 
 .hire-calendar-day {
@@ -66,19 +68,20 @@
 }
 
 .hire-day-available {
-    background-color: #d4edda;
+    background-color: var(--light-green);
 }
 
 .hire-day-unavailable {
-    background-color: #fff3cd;
+    background-color: var(--light-yellow);
 }
 
 .hire-day-low-availability {
-  background-color: #FE85A4;
+  background-color: var(--pale-pink);
 }
 
+.hire-day-booked,
 .hire-day-fully-booked {
-    background-color: #f8d7da;
+    background-color: var(--warm-red);
 }
 
 .rental-attributes .attribute-item {
@@ -146,43 +149,49 @@
 }
 
 .availability-legend-swatch-available {
-    background: #28a745;
+    background: var(--bright-green);
 }
 
 .availability-legend-swatch-unavailable {
-    background: #ffc107;
+    background: var(--amber);
 }
 
 .availability-legend-swatch-low-availability {
-  background: #FE85A4;
+  background: var(--pale-pink);
 }
 
 .availability-legend-swatch-fully-booked {
-    background: #dc3545;
+    background: var(--warm-red);
 }
 
 .ui-datepicker td.hire-day-available a,
 .ui-datepicker td.hire-day-available span {
-    background: #d4edda !important;
-    color: #155724 !important;
+    background: var(--light-green) !important;
+    border-color: var(--bright-green) !important;
+    color: var(--bottle-green) !important;
 }
 
 .ui-datepicker td.hire-day-unavailable a,
 .ui-datepicker td.hire-day-unavailable span {
-    background: #fff3cd !important;
-    color: #856404 !important;
+    background: var(--light-yellow) !important;
+    border-color: var(--amber) !important;
+    color: var(--gold) !important;
 }
 
 .ui-datepicker td.hire-day-low-availability a,
 .ui-datepicker td.hire-day-low-availability span {
-  background: #FE85A4 !important;
-  color: #856404 !important;
+  background: var(--pale-pink) !important;
+  border-color: var(--pale-pink) !important;
+  color: var(--dark-border) !important;
 }
 
+.ui-datepicker td.hire-day-booked a,
+.ui-datepicker td.hire-day-booked span,
 .ui-datepicker td.hire-day-fully-booked a,
 .ui-datepicker td.hire-day-fully-booked span {
-    background: #f8d7da !important;
-    color: #721c24 !important;
+    background: var(--warm-red) !important;
+    border-color: var(--warm-red) !important;
+    color: var(--off-white) !important;
 }
 
 .ui-datepicker td.hire-day-unavailable.ui-datepicker-unselectable {

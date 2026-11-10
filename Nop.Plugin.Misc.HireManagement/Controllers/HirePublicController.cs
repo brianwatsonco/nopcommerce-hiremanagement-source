@@ -91,9 +91,6 @@ public class HirePublicController : BasePluginController
         if (parsedStartStoreTime < nowStore)
             return Json(new { isAvailable = false, message = "Start date/time cannot be in the past." });
 
-        if (product.StockQuantity <= 0)
-            return Json(new { isAvailable = false, message = "This product is currently unavailable for the selected dates." });
-
         var startUtc = _dateTimeHelper.ConvertToUtcTime(DateTime.SpecifyKind(parsedStartStoreTime, DateTimeKind.Unspecified), _dateTimeHelper.DefaultStoreTimeZone);
         var endUtc = _dateTimeHelper.ConvertToUtcTime(DateTime.SpecifyKind(parsedEndStoreTime, DateTimeKind.Unspecified), _dateTimeHelper.DefaultStoreTimeZone);
 
