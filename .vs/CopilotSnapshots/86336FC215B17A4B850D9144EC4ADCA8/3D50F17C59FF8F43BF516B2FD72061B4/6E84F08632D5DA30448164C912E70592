@@ -1,0 +1,232 @@
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Nop.Core;
+using Nop.Core.Caching;
+using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Customers;
+using Nop.Core.Domain.Orders;
+using Nop.Core.Domain.Stores;
+using Nop.Core.Events;
+using Nop.Data;
+using Nop.Services.Attributes;
+using Nop.Services.Catalog;
+using Nop.Services.Common;
+using Nop.Services.Customers;
+using Nop.Services.Directory;
+using Nop.Services.Helpers;
+using Nop.Services.Localization;
+using Nop.Services.Orders;
+using Nop.Services.Security;
+using Nop.Services.Seo;
+using Nop.Services.Shipping;
+using Nop.Services.Shipping.Date;
+using Nop.Services.Stores;
+
+namespace Nop.Plugin.Misc.HireManagement.Services;
+
+public class HireShoppingCartService : ShoppingCartService
+{
+    private readonly IHireBookingService _hireBookingService;
+
+    public HireShoppingCartService(CatalogSettings catalogSettings,
+        IAclService aclService,
+        IAttributeParser<CheckoutAttribute, CheckoutAttributeValue> checkoutAttributeParser,
+        IAttributeService<CheckoutAttribute, CheckoutAttributeValue> checkoutAttributeService,
+        ICurrencyService currencyService,
+        ICustomerService customerService,
+        IDateRangeService dateRangeService,
+        IDateTimeHelper dateTimeHelper,
+        IEventPublisher eventPublisher,
+        IGenericAttributeService genericAttributeService,
+        IGiftCardService giftCardService,
+        IHttpContextAccessor httpContextAccessor,
+        ILocalizationService localizationService,
+        IPermissionService permissionService,
+        IPriceCalculationService priceCalculationService,
+        IPriceFormatter priceFormatter,
+        IProductAttributeParser productAttributeParser,
+        IProductAttributeService productAttributeService,
+        IProductService productService,
+        IRepository<ShoppingCartItem> sciRepository,
+        IShippingService shippingService,
+        IShortTermCacheManager shortTermCacheManager,
+        IStaticCacheManager staticCacheManager,
+        IStoreContext storeContext,
+        IStoreService storeService,
+        IStoreMappingService storeMappingService,
+        IUrlRecordService urlRecordService,
+        IWorkContext workContext,
+        LinkGenerator linkGenerator,
+        OrderSettings orderSettings,
+        ShoppingCartSettings shoppingCartSettings,
+        IHireBookingService hireBookingService)
+        : base(catalogSettings,
+              aclService,
+              checkoutAttributeParser,
+              checkoutAttributeService,
+              currencyService,
+              customerService,
+              dateRangeService,
+              dateTimeHelper,
+              eventPublisher,
+              genericAttributeService,
+              giftCardService,
+              httpContextAccessor,
+              localizationService,
+              permissionService,
+              priceCalculationService,
+              priceFormatter,
+              productAttributeParser,
+              productAttributeService,
+              productService,
+              sciRepository,
+              shippingService,
+              shortTermCacheManager,
+              staticCacheManager,
+              storeContext,
+              storeService,
+              storeMappingService,
+              urlRecordService,
+              workContext,
+              linkGenerator,
+              orderSettings,
+              shoppingCartSettings)
+    {
+        _hireBookingService = hireBookingService;
+    }
+
+    public override async Task<IList<string>> GetShoppingCartItemWarningsAsync(Customer customer, ShoppingCartType shoppingCartType,
+        Product product, int storeId,
+        string attributesXml, decimal customerEnteredPrice,
+        DateTime? rentalStartDate = null, DateTime? rentalEndDate = null,
+        int quantity = 1, bool addRequiredProducts = true, int shoppingCartItemId = 0,
+        bool getStandardWarnings = true, bool getAttributesWarnings = true,
+        bool getGiftCardWarnings = true, bool getRequiredProductWarnings = true,
+        bool getRentalWarnings = true)
+    {
+        var warnings = await base.GetShoppingCartItemWarningsAsync(customer, shoppingCartType, product, storeId, attributesXml,
+            customerEnteredPrice, rentalStartDate, rentalEndDate, quantity, addRequiredProducts, shoppingCartItemId,
+            getStandardWarnings, getAttributesWarnings, getGiftCardWarnings, getRequiredProductWarnings, getRentalWarnings);
+
+        if (warnings.Any())
+            return warnings;
+
+        if (!product.IsRental || shoppingCartType != ShoppingCartType.ShoppingCart || !rentalStartDate.HasValue || !rentalEndDate.HasValue)
+            return warnings;
+
+        var normalizedQuantity = quantity < 1 ? 1 : quantity;
+        var available = await _hireBookingService.IsSelectionAvailableAsync(product.Id, rentalStartDate.Value, rentalEndDate.Value, normalizedQuantity);
+        if (!available)
+            warnings.Add(await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Front.Messages.CartConflict"));
+
+        return warnings;
+    }
+
+    public override async Task<(decimal unitPrice, decimal discountAmount, List<Discount> appliedDiscounts)> GetUnitPriceAsync(Product product,
+        Customer customer,
+        Store store,
+        ShoppingCartType shoppingCartType,
+        int quantity,
+        string attributesXml,
+        decimal customerEnteredPrice,
+        DateTime? rentalStartDate,
+        DateTime? rentalEndDate,
+        bool includeDiscounts)
+    {
+        if (product?.IsRental == true && !string.IsNullOrEmpty(attributesXml))
+            attributesXml = await RemoveDurationAttributesForPricingAsync(product, attributesXml);
+
+        return await base.GetUnitPriceAsync(product,
+            customer,
+            store,
+            shoppingCartType,
+            quantity,
+            attributesXml,
+            customerEnteredPrice,
+            rentalStartDate,
+            rentalEndDate,
+            includeDiscounts);
+    }
+
+    private async Task<string> RemoveDurationAttributesForPricingAsync(Product product, string attributesXml)
+    {
+        var mappings = await _productAttributeParser.ParseProductAttributeMappingsAsync(attributesXml);
+        if (mappings == null || mappings.Count == 0)
+            return attributesXml;
+
+        var productMappings = await _productAttributeService.GetProductAttributeMappingsByProductIdAsync(product.Id);
+        var productMappingIds = productMappings.Select(mapping => mapping.Id).ToHashSet();
+
+        foreach (var mapping in mappings)
+        {
+            if (!productMappingIds.Contains(mapping.Id))
+                continue;
+
+            if (!await IsDurationAttributeMappingAsync(mapping))
+                continue;
+
+            attributesXml = _productAttributeParser.RemoveProductAttribute(attributesXml, mapping);
+        }
+
+        return attributesXml;
+    }
+
+    private async Task<bool> IsDurationAttributeMappingAsync(ProductAttributeMapping mapping)
+    {
+        if (mapping == null)
+            return false;
+
+        if (ContainsDurationKeyword(mapping.TextPrompt))
+            return true;
+
+        var attribute = await _productAttributeService.GetProductAttributeByIdAsync(mapping.ProductAttributeId);
+        return ContainsDurationKeyword(attribute?.Name);
+    }
+
+    private static bool ContainsDurationKeyword(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim().ToLowerInvariant();
+
+        return normalized.Contains("number of days", StringComparison.Ordinal)
+               || normalized.Contains("number of day", StringComparison.Ordinal)
+               || normalized.Contains("duration", StringComparison.Ordinal)
+               || normalized.Equals("days", StringComparison.Ordinal)
+               || normalized.Equals("day", StringComparison.Ordinal)
+               || normalized.EndsWith(" days", StringComparison.Ordinal)
+               || normalized.EndsWith(" day", StringComparison.Ordinal);
+    }
+
+    public override async Task<IList<string>> GetShoppingCartWarningsAsync(IList<ShoppingCartItem> shoppingCart,
+        string checkoutAttributesXml, bool validateCheckoutAttributes)
+    {
+        var warnings = await base.GetShoppingCartWarningsAsync(shoppingCart, checkoutAttributesXml, validateCheckoutAttributes);
+
+        foreach (var item in shoppingCart)
+        {
+            var product = await _productService.GetProductByIdAsync(item.ProductId);
+            if (product == null || !product.IsRental)
+                continue;
+
+            if (!item.RentalStartDateUtc.HasValue || !item.RentalEndDateUtc.HasValue)
+                continue;
+
+            var normalizedQuantity = item.Quantity < 1 ? 1 : item.Quantity;
+            var available = await _hireBookingService.IsSelectionAvailableAsync(product.Id,
+                item.RentalStartDateUtc.Value,
+                item.RentalEndDateUtc.Value,
+                normalizedQuantity);
+
+            if (!available)
+            {
+                var warning = await _localizationService.GetResourceAsync("Plugins.Misc.HireManagement.Front.Messages.CartConflict");
+                if (!warnings.Contains(warning))
+                    warnings.Add(warning);
+            }
+        }
+
+        return warnings;
+    }
+}

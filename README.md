@@ -18,7 +18,7 @@ The HireManagement plugin adds rental-focused capabilities to nopCommerce, inclu
 - Plugin-owned rental product template support
 
 ## Important Setup
-- Assign products that should use hire/rental behavior to the **Rental** product template provided by this plugin (`ProductTemplate.Rental.cshtml`).
+- Assign products that should use hire/rental behavior to the **Rental product** template provided by this plugin (`ProductTemplate.Rental.cshtml`).
 - If a product does not use the Rental template, the rental date/time UI and availability workflow will not be applied.
 
 ## Build

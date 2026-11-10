@@ -1,0 +1,497 @@
+﻿@model ConfigurationModel
+@using System.Globalization
+
+@{
+    Layout = "_ConfigurePlugin";
+    NopHtml.AppendCssFileParts("~/Plugins/Misc.HireManagement/Content/hiremanagement.css");
+    NopHtml.AppendScriptParts(ResourceLocation.Footer, "~/Plugins/Misc.HireManagement/Content/hiremanagement.admin.js");
+}
+
+<form asp-controller="HireManagement" asp-action="Configure" method="get" id="diary-filter-form">
+    <section class="content">
+        <div class="cards-group">
+            <div class="card card-default no-margin">
+                <div class="card-header">@T("Plugins.Misc.HireManagement.Diary")</div>
+                <div class="card-body">
+                    <div class="form-group row">
+                        <div class="col-md-3">
+                            <nop-label asp-for="ProductSearchTerm" />
+                        </div>
+                        <div class="col-md-6">
+                            <nop-editor asp-for="ProductSearchTerm" />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3">
+                            <nop-label asp-for="ProductId" />
+                        </div>
+                        <div class="col-md-9">
+                            <nop-select asp-for="ProductId" asp-items="Model.AvailableProducts" />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3">
+                            <nop-label asp-for="Year" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-editor asp-for="Year" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-label asp-for="Month" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-editor asp-for="Month" />
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">@T("Plugins.Misc.HireManagement.Actions.LoadDiary")</button>
+                        </div>
+                    </div>
+                    @if (Model.ProductId > 0)
+                    {
+                        <div class="alert alert-info">
+                            @T("Plugins.Misc.HireManagement.Product"): @Model.ProductName (@Model.ProductId)
+                        </div>
+                        @if (Model.DiaryDays.Any())
+                        {
+                            var firstDay = new DateTime(Model.Year, Model.Month, 1);
+                            var startPadding = (int)firstDay.DayOfWeek;
+                            var totalCells = startPadding + Model.DiaryDays.Count;
+                            var endPadding = (7 - (totalCells % 7)) % 7;
+                            var displayCells = totalCells + endPadding;
+
+                            <div class="hire-calendar">
+                                <div class="hire-calendar-header">Sun</div>
+                                <div class="hire-calendar-header">Mon</div>
+                                <div class="hire-calendar-header">Tue</div>
+                                <div class="hire-calendar-header">Wed</div>
+                                <div class="hire-calendar-header">Thu</div>
+                                <div class="hire-calendar-header">Fri</div>
+                                <div class="hire-calendar-header">Sat</div>
+
+                                @for (var cellIndex = 0; cellIndex < displayCells; cellIndex++)
+                                {
+                                    if (cellIndex < startPadding || cellIndex >= startPadding + Model.DiaryDays.Count)
+                                    {
+                                        <div class="hire-calendar-cell hire-calendar-empty"></div>
+                                        continue;
+                                    }
+
+                                    var day = Model.DiaryDays[cellIndex - startPadding];
+                                    var badgeClass = day.State switch
+                                    {
+                                        HireAvailabilityState.FullyBooked => "badge-danger",
+                                        HireAvailabilityState.LowAvailability => "badge-warning",
+                                        HireAvailabilityState.Unavailable => "badge-warning",
+                                        _ => "badge-success"
+                                    };
+                                    var stateClass = day.State switch
+                                    {
+                                        HireAvailabilityState.FullyBooked => "hire-day-fully-booked",
+                                        HireAvailabilityState.LowAvailability => "hire-day-low-availability",
+                                        HireAvailabilityState.Unavailable => "hire-day-unavailable",
+                                        _ => "hire-day-available"
+                                    };
+
+                                    var openText = day.Date.DayOfWeek switch
+                                    {
+                                        DayOfWeek.Monday => Model.MondayOpen,
+                                        DayOfWeek.Tuesday => Model.TuesdayOpen,
+                                        DayOfWeek.Wednesday => Model.WednesdayOpen,
+                                        DayOfWeek.Thursday => Model.ThursdayOpen,
+                                        DayOfWeek.Friday => Model.FridayOpen,
+                                        DayOfWeek.Saturday => Model.SaturdayOpen,
+                                        _ => Model.SundayOpen
+                                    };
+                                    var closeText = day.Date.DayOfWeek switch
+                                    {
+                                        DayOfWeek.Monday => Model.MondayClose,
+                                        DayOfWeek.Tuesday => Model.TuesdayClose,
+                                        DayOfWeek.Wednesday => Model.WednesdayClose,
+                                        DayOfWeek.Thursday => Model.ThursdayClose,
+                                        DayOfWeek.Friday => Model.FridayClose,
+                                        DayOfWeek.Saturday => Model.SaturdayClose,
+                                        _ => Model.SundayClose
+                                    };
+
+                                    if (!TimeSpan.TryParse(openText, out var opens))
+                                        opens = TimeSpan.Zero;
+
+                                    if (!TimeSpan.TryParse(closeText, out var closes))
+                                        closes = new TimeSpan(23, 59, 0);
+
+                                    var startDefault = day.Date.Add(opens).ToString("yyyy-MM-ddTHH:mm");
+                                    var endDefault = day.Date.Add(closes).ToString("yyyy-MM-ddTHH:mm");
+                                    var existingRecord = Model.ExistingRecords
+                                        .Where(row => row.StartUtc.Date <= day.Date.Date && row.EndUtc.Date >= day.Date.Date)
+                                        .OrderByDescending(row => row.StartUtc)
+                                        .FirstOrDefault();
+                                    var recordId = existingRecord?.Id ?? 0;
+                                    var recordStart = existingRecord?.StartUtc.ToString("yyyy-MM-ddTHH:mm") ?? startDefault;
+                                    var recordEnd = existingRecord?.EndUtc.ToString("yyyy-MM-ddTHH:mm") ?? endDefault;
+                                    var recordStatusId = existingRecord != null ? (int)existingRecord.Status : (int)HireAvailabilityState.Unavailable;
+                                    var recordCustomerId = existingRecord?.CustomerId?.ToString() ?? string.Empty;
+                                    var recordOrderId = existingRecord?.OrderId?.ToString() ?? string.Empty;
+                                    var recordPaidAmount = existingRecord?.PaidAmount.ToString("0.##", CultureInfo.InvariantCulture) ?? "0";
+                                    var recordQuantity = (existingRecord?.Quantity ?? 1).ToString(CultureInfo.InvariantCulture);
+                                    var recordAdminNote = existingRecord?.AdminNote ?? string.Empty;
+
+                                    <div class="hire-calendar-cell hire-day-cell hire-calendar-day-action @stateClass"
+                                         role="button"
+                                         tabindex="0"
+                                         data-record-id="@recordId"
+                                         data-start="@recordStart"
+                                         data-end="@recordEnd"
+                                         data-status="@recordStatusId"
+                                         data-customer-id="@recordCustomerId"
+                                         data-order-id="@recordOrderId"
+                                         data-paid-amount="@recordPaidAmount"
+                                         data-quantity="@recordQuantity"
+                                         data-admin-note="@recordAdminNote">
+                                        <strong class="hire-calendar-day">@day.Date.Day</strong>
+                                        <span class="badge @badgeClass">@day.State</span>
+                                        <div class="hire-day-quantity">@day.AffectedQuantity/@day.TotalQuantity booked</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+</form>
+
+<form asp-controller="HireManagement" asp-action="Configure" method="post" id="sync-order-bookings-form">
+    <input asp-for="ProductId" type="hidden" />
+    <input asp-for="ProductSearchTerm" type="hidden" />
+    <input asp-for="Year" type="hidden" />
+    <input asp-for="Month" type="hidden" />
+
+    @if (Model.ProductId > 0)
+    {
+        <section class="content">
+            <div class="cards-group">
+                <div class="card card-default no-margin">
+                    <div class="card-body">
+                        <button type="submit" name="sync-order-bookings" class="btn btn-info">
+                            Import website bookings for selected month
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+</form>
+
+<div class="modal fade" id="hire-day-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form asp-controller="HireManagement" asp-action="Configure" method="post" id="hire-day-modal-form">
+                <div class="modal-header">
+                    <h5 class="modal-title">@T("Plugins.Misc.HireManagement.ManageEntry")</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input asp-for="ProductId" type="hidden" />
+                    <input asp-for="ProductSearchTerm" type="hidden" />
+                    <input asp-for="Year" type="hidden" />
+                    <input asp-for="Month" type="hidden" />
+
+                    <div class="form-group">
+                        <label asp-for="RecordId"></label>
+                        <input asp-for="RecordId" class="form-control" id="modal-record-id" />
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="StatusId"></label>
+                        <select asp-for="StatusId" asp-items="Model.AvailableStatuses" class="form-control" id="modal-status-id"></select>
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="StartUtc"></label>
+                        <input asp-for="StartUtc" class="form-control" type="datetime-local" id="modal-start-utc" />
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="EndUtc"></label>
+                        <input asp-for="EndUtc" class="form-control" type="datetime-local" id="modal-end-utc" />
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-6">
+                            <label asp-for="CustomerId"></label>
+                            <input asp-for="CustomerId" class="form-control" id="modal-customer-id" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="OrderId"></label>
+                            <input asp-for="OrderId" class="form-control" id="modal-order-id" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="PaidAmount"></label>
+                        <input asp-for="PaidAmount" class="form-control" id="modal-paid-amount" />
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="Quantity"></label>
+                        <input asp-for="Quantity" class="form-control" id="modal-quantity" min="1" />
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="AdminNote"></label>
+                        <textarea asp-for="AdminNote" class="form-control" id="modal-admin-note"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">@T("Admin.Common.Cancel")</button>
+                    <button type="submit" name="delete-record" class="btn btn-danger" formnovalidate>@T("Plugins.Misc.HireManagement.Actions.DeleteRecord")</button>
+                    <button type="submit" name="save-record" class="btn btn-primary">@T("Plugins.Misc.HireManagement.Actions.SaveRecord")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<form asp-controller="HireManagement" asp-action="Configure" method="post" id="settings-form">
+    <input asp-for="ProductId" type="hidden" />
+    <input asp-for="ProductSearchTerm" type="hidden" />
+    <input asp-for="Year" type="hidden" />
+    <input asp-for="Month" type="hidden" />
+
+    <section class="content">
+        <div class="cards-group">
+            <div class="card card-default no-margin">
+                <div class="card-header">@T("Plugins.Misc.HireManagement.Settings")</div>
+                <div class="card-body">
+                    <div class="form-group row">
+                        <div class="col-md-3">
+                            <nop-label asp-for="BufferHoursBefore" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-editor asp-for="BufferHoursBefore" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-label asp-for="BufferHoursAfter" />
+                        </div>
+                        <div class="col-md-3">
+                            <nop-editor asp-for="BufferHoursAfter" />
+                        </div>
+                    </div>
+
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Monday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="MondayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="MondayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Tuesday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="TuesdayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="TuesdayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Wednesday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="WednesdayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="WednesdayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Thursday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="ThursdayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="ThursdayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Friday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="FridayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="FridayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Saturday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="SaturdayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="SaturdayClose" /></div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-3"><strong>@T("Admin.Configuration.Settings.GeneralCommon.Sunday")</strong></div>
+                        <div class="col-md-3"><nop-editor asp-for="SundayOpen" /></div>
+                        <div class="col-md-3"><nop-editor asp-for="SundayClose" /></div>
+                    </div>
+
+                    <div class="form-group row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" name="save-settings" class="btn btn-primary">@T("Admin.Common.Save")</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</form>
+
+<form asp-controller="HireManagement" asp-action="Configure" method="post" id="entry-form">
+    <input asp-for="ProductId" type="hidden" />
+    <input asp-for="ProductSearchTerm" type="hidden" />
+    <input asp-for="Year" type="hidden" />
+    <input asp-for="Month" type="hidden" />
+
+    <section class="content">
+        <div class="cards-group">
+            <div class="card card-default no-margin">
+                <div class="card-header">@T("Plugins.Misc.HireManagement.ManageEntry")</div>
+                <div class="card-body">
+                    @if (Model.ProductId <= 0)
+                    {
+                        <div class="alert alert-warning">
+                            Select a product and load the diary before managing booking/unavailability records.
+                        </div>
+                    }
+                    else
+                    {
+                        @if (Model.IsSurchargeReviewRequired)
+                        {
+                            <div class="alert alert-warning">@Model.SurchargeReviewNote</div>
+                        }
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <label>@T("Plugins.Misc.HireManagement.Product")</label>
+                            </div>
+                            <div class="col-md-9">
+                                <input class="form-control" value="@($"{Model.ProductName} ({Model.ProductId})")" readonly />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="RecordId" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-editor asp-for="RecordId" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="StatusId" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-select asp-for="StatusId" asp-items="Model.AvailableStatuses" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="StartUtc" />
+                            </div>
+                            <div class="col-md-9">
+                                <input asp-for="StartUtc" class="form-control" type="datetime-local" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="EndUtc" />
+                            </div>
+                            <div class="col-md-9">
+                                <input asp-for="EndUtc" class="form-control" type="datetime-local" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="CustomerId" />
+                            </div>
+                            <div class="col-md-3">
+                                <nop-editor asp-for="CustomerId" />
+                            </div>
+                            <div class="col-md-3">
+                                <nop-label asp-for="OrderId" />
+                            </div>
+                            <div class="col-md-3">
+                                <nop-editor asp-for="OrderId" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="PaidAmount" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-editor asp-for="PaidAmount" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="Quantity" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-editor asp-for="Quantity" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3">
+                                <nop-label asp-for="AdminNote" />
+                            </div>
+                            <div class="col-md-9">
+                                <nop-textarea asp-for="AdminNote" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-9 offset-md-3">
+                                <button type="submit" name="save-record" class="btn btn-primary">@T("Plugins.Misc.HireManagement.Actions.SaveRecord")</button>
+                                <button type="submit" name="delete-record" class="btn btn-danger" formnovalidate>@T("Plugins.Misc.HireManagement.Actions.DeleteRecord")</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.ExistingRecords.Any())
+            {
+                <div class="card card-default no-margin">
+                    <div class="card-header">@T("Plugins.Misc.HireManagement.ExistingRecords")</div>
+                    <div class="card-body">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>@T("Admin.Common.Edit")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.RecordId")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.Status")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.StartUtc")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.EndUtc")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.Customer")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.OrderId")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.PaidAmount")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.Quantity")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.SurchargeReview")</th>
+                                    <th>@T("Plugins.Misc.HireManagement.Fields.AdminNote")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.ExistingRecords)
+                                {
+                                    <tr>
+                                        <td>
+                                            <a class="btn btn-default"
+                                               asp-controller="HireManagement"
+                                               asp-action="EditRecord"
+                                               asp-route-recordId="@row.Id"
+                                               asp-route-productId="@Model.ProductId"
+                                               asp-route-year="@Model.Year"
+                                               asp-route-month="@Model.Month"
+                                               asp-route-productSearchTerm="@Model.ProductSearchTerm">
+                                                @T("Admin.Common.Edit")
+                                            </a>
+                                        </td>
+                                        <td>@row.Id</td>
+                                        <td>@row.Status</td>
+                                        <td>@row.StartUtc</td>
+                                        <td>@row.EndUtc</td>
+                                        <td>@row.CustomerId (@row.CustomerEmail)</td>
+                                        <td>@row.OrderId</td>
+                                        <td>@row.PaidAmount</td>
+                                        <td>
+                                            @if (row.IsSurchargeReviewRequired)
+                                            {
+                                                <span class="badge badge-warning">@T("Plugins.Misc.HireManagement.Fields.SurchargeReview")</span>
+                                            }
+                                        </td>
+                                        <td>@row.AdminNote</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+</form>

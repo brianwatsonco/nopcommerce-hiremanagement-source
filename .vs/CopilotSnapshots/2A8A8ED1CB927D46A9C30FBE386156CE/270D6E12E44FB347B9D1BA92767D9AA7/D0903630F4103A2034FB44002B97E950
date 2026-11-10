@@ -1,0 +1,28 @@
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Nop.Core.Domain.Orders;
+using Nop.Core.Infrastructure;
+using Nop.Plugin.Misc.HireManagement.Services;
+using Nop.Services.Catalog;
+using Nop.Services.Events;
+
+namespace Nop.Plugin.Misc.HireManagement.Infrastructure;
+
+public partial class HireManagementStartup : INopStartup
+{
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<IHireRulesService, HireRulesService>();
+        services.AddScoped<IHireBookingService, HireBookingService>();
+        services.AddScoped<IHireOrderSyncService, HireOrderSyncService>();
+        services.AddScoped<IProductAttributeParser, HireProductAttributeParser>();
+        services.AddScoped<IConsumer<OrderPlacedEvent>, HireOrderEventConsumer>();
+    }
+
+    public void Configure(IApplicationBuilder application)
+    {
+    }
+
+    public int Order => 3000;
+}

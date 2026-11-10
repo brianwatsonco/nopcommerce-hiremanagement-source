@@ -1,0 +1,5 @@
+﻿# Copilot Instructions
+
+## Project Guidelines
+- For nopCommerce plugin project references, prefer linking Nop.Web.Framework.csproj and Nop.Web.csproj rather than multiple lower-level library project references when using source-based references.
+- Design a new nopCommerce 5-compliant theme from scratch instead of upgrading the legacy McRent/CarHaven-derived theme.

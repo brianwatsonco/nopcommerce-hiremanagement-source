@@ -1,0 +1,66 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <NopSourceRoot>$(MSBuildProjectDirectory)\..\..</NopSourceRoot>
+    <HasNopSource Condition="Exists('$(NopSourceRoot)\Libraries\Nop.Core\Nop.Core.csproj')">true</HasNopSource>
+    <OutputPath Condition="'$(HasNopSource)' == 'true'">$(NopSourceRoot)\Presentation\Nop.Web\Plugins\Misc.HireManagement\</OutputPath>
+    <OutDir Condition="'$(HasNopSource)' == 'true'">$(OutputPath)</OutDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(HasNopSource)' == 'true'">
+    <ProjectReference Include="..\..\Libraries\Nop.Core\Nop.Core.csproj" />
+    <ProjectReference Include="..\..\Libraries\Nop.Services\Nop.Services.csproj" />
+    <ProjectReference Include="..\..\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj" />
+    <ClearPluginAssemblies Include="..\..\Build\ClearPluginAssemblies.proj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(HasNopSource)' != 'true'">
+    <PackageReference Include="Nop.Core" Version="5.00.1" />
+    <PackageReference Include="Nop.Services" Version="5.00.1" />
+    <PackageReference Include="Nop.Web.Framework" Version="5.00.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Views\**\*.cshtml" />
+    <None Remove="Content\hiremanagement.css" />
+    <None Remove="Content\hiremanagement.admin.js" />
+    <None Remove="Content\hiremanagement.rental.js" />
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.admin.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.rental.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Views\**\*.cshtml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\Back\" />
+    <Folder Include="Views\Front\" />
+    <Folder Include="Views\Shared\" />
+  </ItemGroup>
+
+  <Target Name="NopTarget" AfterTargets="Build" Condition="'$(HasNopSource)' == 'true'">
+    <MSBuild Projects="@(ClearPluginAssemblies)" Properties="PluginPath=$(OutDir)" Targets="NopClear" />
+  </Target>
+
+</Project>

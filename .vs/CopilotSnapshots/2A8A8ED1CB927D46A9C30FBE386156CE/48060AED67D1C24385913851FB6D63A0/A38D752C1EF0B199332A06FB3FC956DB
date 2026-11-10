@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <NopSourceRoot Condition="'$(NopSourceRoot)' == ''">$(NOP_SOURCE_ROOT)</NopSourceRoot>
+    <OutputPath>$(MSBuildProjectDirectory)\..\..\Presentation\Nop.Web\Plugins\Misc.HireManagement\</OutputPath>
+    <OutDir>$(OutputPath)</OutDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NopSourceRoot)' != ''">
+    <ProjectReference Include="$(NopSourceRoot)\Libraries\Nop.Core\Nop.Core.csproj" />
+    <ProjectReference Include="$(NopSourceRoot)\Libraries\Nop.Services\Nop.Services.csproj" />
+    <ProjectReference Include="$(NopSourceRoot)\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj" />
+    <ClearPluginAssemblies Include="$(NopSourceRoot)\Build\ClearPluginAssemblies.proj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Views\**\*.cshtml" />
+    <None Remove="Content\hiremanagement.css" />
+    <None Remove="Content\hiremanagement.admin.js" />
+    <None Remove="Content\hiremanagement.rental.js" />
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.admin.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.rental.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Views\**\*.cshtml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\Back\" />
+    <Folder Include="Views\Front\" />
+    <Folder Include="Views\Shared\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Nop.Plugin.Misc.HireManagement.csproj.user" />
+  </ItemGroup>
+
+  <Target Name="ValidateNopSourceRoot" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(NopSourceRoot)' == ''" Text="NopSourceRoot is not set. Set MSBuild property NopSourceRoot or environment variable NOP_SOURCE_ROOT to your nopCommerce src root (the folder containing Libraries and Presentation)." />
+    <Error Condition="!Exists('$(NopSourceRoot)\Libraries\Nop.Core\Nop.Core.csproj')" Text="NopSourceRoot '$(NopSourceRoot)' is invalid. Expected: $(NopSourceRoot)\Libraries\Nop.Core\Nop.Core.csproj" />
+    <Error Condition="!Exists('$(NopSourceRoot)\Libraries\Nop.Services\Nop.Services.csproj')" Text="NopSourceRoot '$(NopSourceRoot)' is invalid. Expected: $(NopSourceRoot)\Libraries\Nop.Services\Nop.Services.csproj" />
+    <Error Condition="!Exists('$(NopSourceRoot)\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj')" Text="NopSourceRoot '$(NopSourceRoot)' is invalid. Expected: $(NopSourceRoot)\Presentation\Nop.Web.Framework\Nop.Web.Framework.csproj" />
+  </Target>
+
+  <Target Name="NopTarget" AfterTargets="Build" Condition="Exists('$(NopSourceRoot)\Build\ClearPluginAssemblies.proj')">
+    <MSBuild Projects="@(ClearPluginAssemblies)" Properties="PluginPath=$(OutDir)" Targets="NopClear" />
+  </Target>
+
+</Project>

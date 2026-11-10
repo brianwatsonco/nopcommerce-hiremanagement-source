@@ -1,0 +1,29 @@
+﻿(function ($) {
+    'use strict';
+
+    $(function () {
+        function openDayModal($target) {
+            $('#modal-record-id').val($target.data('record-id') || '0');
+            $('#modal-start-utc').val($target.data('start'));
+            $('#modal-end-utc').val($target.data('end'));
+            $('#modal-status-id').val($target.data('status'));
+            $('#modal-customer-id').val($target.data('customer-id') || '');
+            $('#modal-order-id').val($target.data('order-id') || '');
+            $('#modal-paid-amount').val($target.data('paid-amount') || '0');
+            $('#modal-quantity').val($target.data('quantity') || '1');
+            $('#modal-admin-note').val($target.data('admin-note') || '');
+            $('#hire-day-modal').modal('show');
+        }
+
+        $(document).on('click', '.hire-calendar-day-action', function () {
+            openDayModal($(this));
+        });
+
+        $(document).on('keydown', '.hire-calendar-day-action', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openDayModal($(this));
+            }
+        });
+    });
+})(jQuery);

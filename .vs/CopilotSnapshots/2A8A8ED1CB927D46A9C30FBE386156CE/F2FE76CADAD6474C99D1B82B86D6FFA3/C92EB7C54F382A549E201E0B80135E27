@@ -1,0 +1,483 @@
+﻿(function ($) {
+    'use strict';
+
+    function initializeRentalAttributes(container) {
+        var $container = $(container);
+        var config = {
+            productId: parseInt($container.data('product-id'), 10),
+            dateFormat: $container.data('date-format'),
+            defaultDurationDays: parseInt($container.data('default-duration-days'), 10) || 1,
+            durationAttributeId: parseInt($container.data('duration-attribute-id'), 10) || 0,
+            defaultStartTime: $container.data('start-time-default') || '09:00',
+            defaultEndTime: $container.data('end-time-default') || '09:00',
+            attributeChangeUrl: $container.data('attribute-change-url'),
+            monthlyAvailabilityUrl: $container.data('monthly-availability-url'),
+            validateSelectionUrl: $container.data('validate-selection-url'),
+            addToCartUrl: $container.data('add-to-cart-url'),
+            formSelector: $container.data('form-selector') || '#product-details-form',
+            startDateId: $container.data('start-date-id'),
+            endDateId: $container.data('end-date-id'),
+            startTimeId: $container.data('start-time-id'),
+            endTimeId: $container.data('end-time-id'),
+            startDateTimeId: $container.data('start-datetime-id'),
+            endDateTimeId: $container.data('end-datetime-id'),
+            startLegacyId: $container.data('start-legacy-id'),
+            endLegacyId: $container.data('end-legacy-id')
+        };
+
+        var $startDateInput = $('#' + config.startDateId);
+        var $endDateInput = $('#' + config.endDateId);
+        var $startTimeSelect = $('#' + config.startTimeId);
+        var $endTimeSelect = $('#' + config.endTimeId);
+        var $startDateTimeHidden = $('#' + config.startDateTimeId);
+        var $endDateTimeHidden = $('#' + config.endDateTimeId);
+        var $startLegacyHidden = $('#' + config.startLegacyId);
+        var $endLegacyHidden = $('#' + config.endLegacyId);
+        var $form = $(config.formSelector);
+
+        if (!$startDateInput.length || !$endDateInput.length || !$startTimeSelect.length || !$endTimeSelect.length || !$form.length)
+            return;
+
+        var availabilityByDate = {};
+
+        function pad(v) { return v.toString().padStart(2, '0'); }
+
+        function formatIsoDate(date) {
+            return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+        }
+
+        function formatLegacyDate(date) {
+            return pad(date.getDate()) + '/' + pad(date.getMonth() + 1) + '/' + date.getFullYear();
+        }
+
+        function parsePickerDate(value) {
+            try { return $.datepicker.parseDate(config.dateFormat, value); }
+            catch (e) { return null; }
+        }
+
+        function getTodayDate() {
+            var today = new Date();
+            return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+        }
+
+        function composeDateTime(date, timeText) {
+            if (!date || !timeText)
+                return '';
+
+            var parts = timeText.split(':');
+            var h = parseInt(parts[0] || '0', 10);
+            var m = parseInt(parts[1] || '0', 10);
+            return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(h) + ':' + pad(m);
+        }
+
+        function parseIsoDateTimeValue(value) {
+            if (!value)
+                return null;
+
+            var match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (!match)
+                return null;
+
+            var year = parseInt(match[1], 10);
+            var month = parseInt(match[2], 10) - 1;
+            var day = parseInt(match[3], 10);
+            var hour = parseInt(match[4], 10);
+            var minute = parseInt(match[5], 10);
+
+            return new Date(year, month, day, hour, minute, 0, 0);
+        }
+
+        function setFormFieldValue(formData, name, value) {
+            var updated = false;
+            for (var i = 0; i < formData.length; i++) {
+                if (formData[i].name === name) {
+                    formData[i].value = value;
+                    updated = true;
+                }
+            }
+
+            if (!updated)
+                formData.push({ name: name, value: value });
+        }
+
+        function buildPriceRefreshFormData() {
+            var formData = $form.serializeArray();
+
+            var startDateTimeValue = $startDateTimeHidden.val();
+            var startDateTime = parseIsoDateTimeValue(startDateTimeValue);
+            if (!startDateTime)
+                return formData;
+
+            var selectedDurationDays = getSelectedDurationDays();
+            var normalizedDaysForPricing = selectedDurationDays > 7 ? 7 : selectedDurationDays;
+            if (!normalizedDaysForPricing || normalizedDaysForPricing < 1)
+                normalizedDaysForPricing = 1;
+
+            var normalizedEndDateTime = new Date(startDateTime.getTime());
+            normalizedEndDateTime.setDate(normalizedEndDateTime.getDate() + normalizedDaysForPricing);
+
+            var startDateTimeFieldName = config.startDateTimeId;
+            var endDateTimeFieldName = config.endDateTimeId;
+            var startLegacyFieldName = config.startLegacyId;
+            var endLegacyFieldName = config.endLegacyId;
+
+            var startDatePart = new Date(startDateTime.getFullYear(), startDateTime.getMonth(), startDateTime.getDate(), 0, 0, 0, 0);
+            var endDatePart = new Date(normalizedEndDateTime.getFullYear(), normalizedEndDateTime.getMonth(), normalizedEndDateTime.getDate(), 0, 0, 0, 0);
+            var startTimePart = pad(startDateTime.getHours()) + ':' + pad(startDateTime.getMinutes());
+            var endTimePart = pad(normalizedEndDateTime.getHours()) + ':' + pad(normalizedEndDateTime.getMinutes());
+
+            setFormFieldValue(formData, startDateTimeFieldName, composeDateTime(startDatePart, startTimePart));
+            setFormFieldValue(formData, endDateTimeFieldName, composeDateTime(endDatePart, endTimePart));
+            setFormFieldValue(formData, startLegacyFieldName, formatLegacyDate(startDatePart));
+            setFormFieldValue(formData, endLegacyFieldName, formatLegacyDate(endDatePart));
+
+            return formData;
+        }
+
+        function parseTimeToParts(timeText) {
+            if (!timeText)
+                return null;
+
+            var parts = timeText.split(':');
+            var h = parseInt(parts[0] || '0', 10);
+            var m = parseInt(parts[1] || '0', 10);
+            if (isNaN(h) || isNaN(m))
+                return null;
+
+            return { hours: h, minutes: m };
+        }
+
+        function parseDurationDaysFromText(text) {
+            var match = (text || '').match(/(\d+)\s*day/i);
+            if (!match || !match[1])
+                return null;
+
+            var days = parseInt(match[1], 10);
+            return days > 0 ? days : null;
+        }
+
+        function calculateDurationDaysFromSelection() {
+            var startDate = parsePickerDate($startDateInput.val());
+            var endDate = parsePickerDate($endDateInput.val());
+            var startTime = parseTimeToParts($startTimeSelect.val());
+            var endTime = parseTimeToParts($endTimeSelect.val());
+
+            if (!startDate || !endDate || !startTime || !endTime)
+                return null;
+
+            var startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+            var endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 0, 0, 0, 0);
+            if (endDay <= startDay)
+                return null;
+
+            var daySpan = Math.round((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+            var durationDays = Math.max(1, daySpan);
+
+            var startMinutes = (startTime.hours * 60) + startTime.minutes;
+            var endMinutes = (endTime.hours * 60) + endTime.minutes;
+            if (endMinutes > startMinutes)
+                durationDays += 1;
+
+            return durationDays;
+        }
+
+        function updateDurationAttributeFromDateTimeSelection() {
+            if (config.durationAttributeId <= 0)
+                return false;
+
+            var durationSelect = document.getElementById('product_attribute_' + config.durationAttributeId);
+            if (!durationSelect || !durationSelect.options || durationSelect.options.length === 0)
+                return false;
+
+            var targetDays = calculateDurationDaysFromSelection();
+            if (!targetDays)
+                return false;
+
+            var candidates = [];
+            for (var i = 0; i < durationSelect.options.length; i++) {
+                var option = durationSelect.options[i];
+                var optionDays = parseDurationDaysFromText(option.text);
+                if (!optionDays)
+                    continue;
+
+                candidates.push({ index: i, days: optionDays });
+            }
+
+            if (candidates.length === 0)
+                return false;
+
+            var chosen = null;
+            for (var j = 0; j < candidates.length; j++) {
+                if (candidates[j].days === targetDays) {
+                    chosen = candidates[j];
+                    break;
+                }
+            }
+
+            if (!chosen) {
+                var above = candidates.filter(function (candidate) { return candidate.days >= targetDays; });
+                if (above.length > 0) {
+                    above.sort(function (a, b) { return a.days - b.days; });
+                    chosen = above[0];
+                } else {
+                    candidates.sort(function (a, b) { return b.days - a.days; });
+                    chosen = candidates[0];
+                }
+            }
+
+            if (durationSelect.selectedIndex === chosen.index)
+                return false;
+
+            durationSelect.selectedIndex = chosen.index;
+            return true;
+        }
+
+        function refreshPriceData() {
+            var priceRefreshData = buildPriceRefreshFormData();
+            $.ajax({
+                cache: false,
+                url: config.attributeChangeUrl,
+                data: $.param(priceRefreshData),
+                type: 'POST',
+                success: function (data) {
+                    if (data.sku) $('#sku-' + config.productId).text(data.sku);
+                    if (data.mpn) $('#mpn-' + config.productId).text(data.mpn);
+                    if (data.gtin) $('#gtin-' + config.productId).text(data.gtin);
+                    if (data.price) {
+                        var $priceElement = $('.price-value-' + config.productId);
+                        if ($priceElement.length)
+                            $priceElement.text(data.price);
+                    }
+                }
+            });
+        }
+
+        function syncHiddenFields() {
+            var startDate = parsePickerDate($startDateInput.val());
+            var endDate = parsePickerDate($endDateInput.val());
+
+            if (startDate) {
+                $startLegacyHidden.val(formatLegacyDate(startDate));
+                $startDateTimeHidden.val(composeDateTime(startDate, $startTimeSelect.val()));
+            }
+
+            if (endDate) {
+                $endLegacyHidden.val(formatLegacyDate(endDate));
+                $endDateTimeHidden.val(composeDateTime(endDate, $endTimeSelect.val()));
+            }
+        }
+
+        function getSelectedDurationDays() {
+            if (config.durationAttributeId > 0) {
+                var durationSelect = document.getElementById('product_attribute_' + config.durationAttributeId);
+                if (durationSelect && durationSelect.selectedIndex >= 0) {
+                    var durationOption = durationSelect.options[durationSelect.selectedIndex];
+                    var parsedDurationDays = parseDurationDaysFromText(durationOption ? durationOption.text : '');
+                    if (parsedDurationDays)
+                        return parsedDurationDays;
+                }
+            }
+
+            var selects = document.querySelectorAll(config.formSelector + " select[id^='product_attribute_']");
+            for (var i = 0; i < selects.length; i++) {
+                var selectedOption = selects[i].options[selects[i].selectedIndex];
+                if (!selectedOption)
+                    continue;
+
+                var text = selectedOption.text || '';
+                var match = text.match(/(\d+)\s*day/i);
+                if (match && match[1]) {
+                    var parsedDays = parseInt(match[1], 10);
+                    if (parsedDays > 0)
+                        return parsedDays;
+                }
+            }
+
+            return config.defaultDurationDays;
+        }
+
+        function setEndDateFromDuration() {
+            var startDate = parsePickerDate($startDateInput.val());
+            if (!startDate)
+                return;
+
+            var days = getSelectedDurationDays();
+            if (!days || days < 1)
+                days = 1;
+
+            var endDate = new Date(startDate.getTime());
+            endDate.setDate(endDate.getDate() + days);
+            $endDateInput.val($.datepicker.formatDate(config.dateFormat, endDate));
+            syncHiddenFields();
+            updateDurationAttributeFromDateTimeSelection();
+            refreshPriceData();
+        }
+
+        function loadMonthlyAvailability(year, month, done) {
+            $.get(config.monthlyAvailabilityUrl, {
+                productId: config.productId,
+                year: year,
+                month: month,
+                durationDays: getSelectedDurationDays()
+            }).done(function (response) {
+                availabilityByDate = {};
+                if (response && response.success && response.days) {
+                    for (var i = 0; i < response.days.length; i++)
+                        availabilityByDate[response.days[i].date] = response.days[i].state;
+                }
+                if (done) done();
+            }).fail(function () {
+                availabilityByDate = {};
+                if (done) done();
+            });
+        }
+
+        function getDateClassInfo(date) {
+            var today = getTodayDate();
+            if (date < today)
+                return [false, 'hire-day-unavailable', 'Unavailable'];
+
+            var key = formatIsoDate(date);
+            var state = availabilityByDate[key] || 'Available';
+            if (state === 'FullyBooked')
+                return [false, 'hire-day-fully-booked', 'Fully booked'];
+            if (state === 'LowAvailability')
+                return [true, 'hire-day-low-availability', 'Low availability'];
+            if (state === 'Unavailable')
+                return [false, 'hire-day-unavailable', 'Unavailable'];
+            return [true, 'hire-day-available', 'Available'];
+        }
+
+        function validateSelectionAndAddToCart() {
+            syncHiddenFields();
+            $.ajax({
+                cache: false,
+                url: config.validateSelectionUrl,
+                data: {
+                    productId: config.productId,
+                    startDateTime: $startDateTimeHidden.val(),
+                    endDateTime: $endDateTimeHidden.val()
+                },
+                type: 'POST',
+                success: function (data) {
+                    if (data && data.isAvailable) {
+                        AjaxCart.addproducttocart_details(config.addToCartUrl, config.formSelector);
+                        return;
+                    }
+
+                    alert((data && data.message) ? data.message : 'Selected dates are not available.');
+                },
+                error: function () {
+                    alert('Unable to validate booking availability right now. Please try again.');
+                }
+            });
+        }
+
+        function populateTimeSelect($select, selectedValue) {
+            $select.empty();
+            for (var hour = 0; hour < 24; hour++) {
+                for (var minute = 0; minute < 60; minute += 30) {
+                    var value = pad(hour) + ':' + pad(minute);
+                    var $option = $('<option/>').val(value).text(value);
+                    if (value === selectedValue)
+                        $option.attr('selected', 'selected');
+                    $select.append($option);
+                }
+            }
+        }
+
+        populateTimeSelect($startTimeSelect, config.defaultStartTime);
+        populateTimeSelect($endTimeSelect, config.defaultEndTime);
+
+        $startDateInput.datepicker({
+            dateFormat: config.dateFormat,
+            minDate: 0,
+            beforeShowDay: getDateClassInfo,
+            onChangeMonthYear: function (year, month) {
+                loadMonthlyAvailability(year, month, function () {
+                    $startDateInput.datepicker('refresh');
+                });
+            },
+            onSelect: function () {
+                setEndDateFromDuration();
+            }
+        });
+
+        $endDateInput.datepicker({
+            dateFormat: config.dateFormat,
+            minDate: 0,
+            beforeShowDay: getDateClassInfo,
+            onChangeMonthYear: function (year, month) {
+                loadMonthlyAvailability(year, month, function () {
+                    $endDateInput.datepicker('refresh');
+                });
+            },
+            onSelect: function () {
+                syncHiddenFields();
+                updateDurationAttributeFromDateTimeSelection();
+                refreshPriceData();
+            }
+        });
+
+        $startTimeSelect.on('change', function () {
+            syncHiddenFields();
+            updateDurationAttributeFromDateTimeSelection();
+            refreshPriceData();
+        });
+
+        $endTimeSelect.on('change', function () {
+            syncHiddenFields();
+            updateDurationAttributeFromDateTimeSelection();
+            refreshPriceData();
+        });
+
+        var attributeSelects = document.querySelectorAll(config.formSelector + " select[id^='product_attribute_']");
+        for (var i = 0; i < attributeSelects.length; i++) {
+            attributeSelects[i].addEventListener('change', function (event) {
+                var changedSelect = event && event.target ? event.target : this;
+                setEndDateFromDuration();
+                var startDate = parsePickerDate($startDateInput.val()) || new Date();
+                loadMonthlyAvailability(startDate.getFullYear(), startDate.getMonth() + 1, function () {
+                    $startDateInput.datepicker('refresh');
+                    $endDateInput.datepicker('refresh');
+                });
+
+                if (config.durationAttributeId > 0 && changedSelect && changedSelect.id === ('product_attribute_' + config.durationAttributeId)) {
+                    window.setTimeout(function () {
+                        syncHiddenFields();
+                        refreshPriceData();
+                    }, 250);
+                }
+            });
+        }
+
+        var addToCartButton = document.getElementById('add-to-cart-button-' + config.productId);
+        if (addToCartButton) {
+            addToCartButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                validateSelectionAndAddToCart();
+            }, true);
+        }
+
+        var today = getTodayDate();
+        var initialStartDate = parsePickerDate($startDateInput.val());
+        if (!initialStartDate || initialStartDate < today) {
+            $startDateInput.val($.datepicker.formatDate(config.dateFormat, today));
+            setEndDateFromDuration();
+        }
+
+        var initialDate = parsePickerDate($startDateInput.val()) || today;
+        loadMonthlyAvailability(initialDate.getFullYear(), initialDate.getMonth() + 1, function () {
+            $startDateInput.datepicker('refresh');
+            $endDateInput.datepicker('refresh');
+            setEndDateFromDuration();
+        });
+    }
+
+    $(function () {
+        $('.rental-attributes[data-rental-config="true"]').each(function () {
+            initializeRentalAttributes(this);
+        });
+    });
+})(jQuery);

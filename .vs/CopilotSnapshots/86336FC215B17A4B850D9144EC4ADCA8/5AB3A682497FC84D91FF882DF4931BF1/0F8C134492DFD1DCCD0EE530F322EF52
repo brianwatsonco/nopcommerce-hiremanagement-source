@@ -1,0 +1,204 @@
+﻿@import url("../Themes/McTours/Content/css/root.css");
+
+.hire-day-cell {
+    color: var(--dark-border);
+}
+
+.hire-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.hire-calendar-header {
+    font-weight: 600;
+    text-align: center;
+    padding: 0.35rem 0.2rem;
+    background-color: var(--off-white);
+    border: 1px solid var(--light-grey);
+}
+
+.hire-calendar-cell {
+    min-height: 78px;
+    padding: 0.4rem;
+    border: 1px solid var(--light-grey);
+    border-radius: 4px;
+}
+
+.hire-calendar-day-action {
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.hire-calendar-day-action:hover,
+.hire-calendar-day-action:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+    outline: none;
+}
+
+.hire-calendar-empty {
+    border: 1px dashed var(--light-grey);
+    background-color: var(--off-white);
+}
+
+.hire-calendar-day {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.hire-day-state {
+    font-size: 0.9rem;
+}
+
+.hire-day-quantity {
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .hire-calendar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hire-calendar-header {
+        display: none;
+    }
+}
+
+.hire-day-available {
+    background-color: var(--light-green);
+}
+
+.hire-day-unavailable {
+    background-color: var(--light-yellow);
+}
+
+.hire-day-low-availability {
+  background-color: var(--pale-pink);
+}
+
+.hire-day-fully-booked {
+    background-color: var(--warm-red);
+}
+
+.rental-attributes .attribute-item {
+    margin-bottom: 12px;
+}
+
+.rental-attributes .attribute-label {
+    margin-bottom: 4px;
+}
+
+.rental-attributes .attribute-data {
+    max-width: 420px;
+}
+
+.rental-attributes .rental-row-controls {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(120px, 160px);
+    gap: 10px;
+    align-items: center;
+}
+
+.rental-attributes .attribute-data select,
+.rental-attributes .attribute-data input[type="text"] {
+    width: 100%;
+}
+
+.rental-attributes .attribute-data .attributes {
+    margin: 0;
+}
+
+.rental-attributes .attribute-data .attributes dl,
+.rental-attributes .attribute-data .attributes dt,
+.rental-attributes .attribute-data .attributes dd {
+    margin: 0;
+}
+
+.rental-attributes .attribute-data .attributes dt {
+    display: none;
+}
+
+.rental-attributes .availability-legend {
+    margin-top: 0;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .rental-attributes .rental-row-controls {
+        grid-template-columns: 1fr;
+    }
+}
+
+.availability-legend-item {
+    display: inline-flex;
+    align-items: center;
+}
+
+.availability-legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 6px;
+}
+
+.availability-legend-swatch-available {
+    background: var(--bright-green);
+}
+
+.availability-legend-swatch-unavailable {
+    background: var(--amber);
+}
+
+.availability-legend-swatch-low-availability {
+  background: var(--pale-pink);
+}
+
+.availability-legend-swatch-fully-booked {
+    background: var(--warm-red);
+}
+
+.ui-datepicker td.hire-day-available a,
+.ui-datepicker td.hire-day-available span {
+    background: var(--light-green) !important;
+    color: var(--bottle-green) !important;
+}
+
+.ui-datepicker td.hire-day-unavailable a,
+.ui-datepicker td.hire-day-unavailable span {
+    background: var(--light-yellow) !important;
+    color: var(-gold) !important;
+}
+
+.ui-datepicker td.hire-day-low-availability a,
+.ui-datepicker td.hire-day-low-availability span {
+  background: var(--pale-pink) !important;
+  color: var(-gold) !important;
+}
+
+.ui-datepicker td.hire-day-fully-booked a,
+.ui-datepicker td.hire-day-fully-booked span {
+    background: var(--light-green) !important;
+    color: var(--bottle-green) !important;
+}
+
+.ui-datepicker td.hire-day-unavailable.ui-datepicker-unselectable {
+    opacity: 1 !important;
+}
+
+.ui-datepicker td.hire-day-fully-booked.ui-datepicker-unselectable {
+    opacity: 1 !important;
+}
+
+.ui-datepicker td.hire-day-unavailable.ui-datepicker-unselectable .ui-state-default {
+    opacity: 1 !important;
+}
+
+.ui-datepicker td.hire-day-fully-booked.ui-datepicker-unselectable .ui-state-default {
+    opacity: 1 !important;
+}

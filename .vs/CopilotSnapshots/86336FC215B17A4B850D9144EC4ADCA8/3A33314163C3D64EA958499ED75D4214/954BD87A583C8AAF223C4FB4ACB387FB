@@ -1,0 +1,11 @@
+﻿# Copilot Instructions
+
+## Project Guidelines
+- For nopCommerce plugin project references, prefer linking Nop.Web.Framework.csproj and Nop.Web.csproj rather than multiple lower-level library project references when using source-based references.
+- Use release source path H:\Brian\Visual Studio\nopCommerce_5.00.0_Source for nopCommerce 5 reference checks.
+- Use nopCommerce source from C:\Users\BrianWatson\Downloads\nopCommerce_5.00.1_Source for upcoming investigations and fixes.
+- Design a new nopCommerce 5-compliant theme from scratch instead of upgrading the legacy McRent/CarHaven-derived theme.
+
+## Debugging Guidelines
+- During troubleshooting/testing, disable JS and CSS minification to simplify debugging and verify runtime behavior.
+- When provided with rendered page output, explicitly acknowledge key observed diagnostics (e.g., minification state) from that evidence instead of restating later.

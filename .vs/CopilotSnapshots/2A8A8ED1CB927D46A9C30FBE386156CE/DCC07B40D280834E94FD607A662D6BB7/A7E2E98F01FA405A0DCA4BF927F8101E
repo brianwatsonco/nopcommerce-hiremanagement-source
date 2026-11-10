@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <NopBinariesPath Condition="'$(NopBinariesPath)' == ''">$(NOP_BINARIES_PATH)</NopBinariesPath>
+    <OutputPath>$(MSBuildProjectDirectory)\..\..\Presentation\Nop.Web\Plugins\Misc.HireManagement\</OutputPath>
+    <OutDir>$(OutputPath)</OutDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Nop.Core">
+      <HintPath>$(NopBinariesPath)\Nop.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Nop.Services">
+      <HintPath>$(NopBinariesPath)\Nop.Services.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Nop.Web.Framework">
+      <HintPath>$(NopBinariesPath)\Nop.Web.Framework.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Views\**\*.cshtml" />
+    <None Remove="Content\hiremanagement.css" />
+    <None Remove="Content\hiremanagement.admin.js" />
+    <None Remove="Content\hiremanagement.rental.js" />
+    <Content Include="plugin.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.admin.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Content\hiremanagement.rental.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Views\**\*.cshtml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\Back\" />
+    <Folder Include="Views\Front\" />
+    <Folder Include="Views\Shared\" />
+  </ItemGroup>
+
+  <Target Name="ValidateNopBinariesPath" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(NopBinariesPath)' == ''" Text="NopBinariesPath is not set. Set MSBuild property NopBinariesPath or environment variable NOP_BINARIES_PATH to a folder containing Nop.Core.dll, Nop.Services.dll, and Nop.Web.Framework.dll." />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Core.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Core.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Services.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Services.dll" />
+    <Error Condition="!Exists('$(NopBinariesPath)\Nop.Web.Framework.dll')" Text="NopBinariesPath '$(NopBinariesPath)' is invalid. Expected: $(NopBinariesPath)\Nop.Web.Framework.dll" />
+  </Target>
+
+</Project>
