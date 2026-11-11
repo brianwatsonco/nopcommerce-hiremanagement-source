@@ -20,6 +20,7 @@ The HireManagement plugin adds rental-focused capabilities to nopCommerce, inclu
 ## Important Setup
 - Assign products that should use hire/rental behavior to the **Rental product** template provided by this plugin (`ProductTemplate.Rental.cshtml`).
 - If a product does not use the Rental template, the rental date/time UI and availability workflow will not be applied.
+- For rental products managed by this plugin, set **Inventory method** to **Do not track inventory** in nopCommerce Product Admin. Availability is managed by booking date windows and rental quantity over time; core stock decrements can conflict with booking-window availability.
 
 ## Build
 From repository root:
@@ -49,6 +50,16 @@ if (Test-Path $zip) { Remove-Item $zip -Force } New-Item -ItemType Directory -Fo
 - Website booking sync now uses authoritative validated save logic and transaction-protected persistence.
 - Public availability endpoints now enforce stricter year/month/duration bounds and use duration-aware monthly availability.
 - Server-side cart/checkout enforcement added via shopping cart service override to prevent bypassing availability checks.
+
+## Phase 3 (v5.00.3) Updates
+- Rental price refresh now updates consistently when any product option changes (days, mileage, extras, and date/time selectors).
+- Server and client pricing logic aligned so cart totals match displayed totals for rental selections.
+- Added cart overlap guard to block overlapping rental lines for the same product when capacity would be exceeded.
+- Public availability calendar now renders day-by-day occupancy (`durationDays=1`) for clearer diary parity.
+- Calendar day-state styling updated so FullyBooked / Unavailable / LowAvailability states are visually distinct in the storefront datepicker.
+- Removed stock-quantity hard block in public rental validation; availability is now driven by booking-window logic.
+- Availability calculations now apply an effective rental capacity floor to avoid month-wide false `0/0` FullyBooked rendering after core stock side effects.
+- Added setup recommendation to use **Do not track inventory** for rental products managed by this plugin.
 
 ## Contributing
 Issues and pull requests are welcome.  
